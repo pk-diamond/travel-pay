@@ -26,6 +26,7 @@
       <div class="card-body">
         <h5 class="card-title text-center text-success mb-3 fw-bold">旅行精算フォーム</h5>
         <form id="settlementForm">
+          
           <div class="row g-2 mb-3">
             <div class="col-6"><small class="fw-bold">レンタカー</small><input type="number" class="form-control amount-input" id="rentalCar" placeholder="0"></div>
             <div class="col-6"><small class="fw-bold">高速代</small><input type="number" class="form-control amount-input" id="highway" placeholder="0"></div>
@@ -47,13 +48,14 @@
 
           <div id="otherItems">
             <script>
-              for(let i=1; i<=4; i++) {
+              for(let i=1; i<=8; i++) {
                 document.write(`<div class="input-group input-group-sm mb-2 other-row"><span class="input-group-text">他${i}</span><input type="text" class="form-control item-name"><input type="number" class="form-control amount-input" placeholder="0"></div>`);
               }
             </script>
           </div>
 
-          <div class="mb-3 mt-3">
+          <div class="mb-3 mt-4">
+            <label for="splitCount" class="form-label small fw-bold">何人で割りますか？</label>
             <select class="form-select" id="splitCount">
               <option value="1">1人</option><option value="2" selected>2人</option><option value="3">3人</option><option value="4">4人</option>
             </select>
@@ -65,7 +67,7 @@
           </div>
 
           <button type="button" class="btn btn-success w-100 py-3 fw-bold" id="sendBtn" onclick="onSend()">
-            LINEに送信
+            友だちを選んで送信
           </button>
         </form>
       </div>
@@ -75,19 +77,16 @@
 
 <script>
   // ==========================================
-  // ★設定：ここにあなたのLIFF IDを入れてください
+  // ★設定：あなたのLIFF IDを入れてください
   const LIFF_ID = "2008842942-XFy8Tty3"; 
   // ==========================================
 
   window.onload = function() {
-    // GitHub Pagesなら iframe問題がないため、標準的なログイン処理でOKです
     liff.init({ liffId: LIFF_ID })
       .then(() => {
-        // ログインしていない場合はログインさせる
         if (!liff.isLoggedIn()) {
           liff.login();
         } else {
-          // ログイン済みなら画面を表示
           document.getElementById('loading').classList.add('d-none');
           document.getElementById('mainView').classList.remove('d-none');
         }
@@ -97,7 +96,7 @@
       });
   };
 
-  // 自動計算ロジック
+  // 自動計算
   document.addEventListener('input', function() {
     const d = parseFloat(document.getElementById('dist').value)||0;
     const e = parseFloat(document.getElementById('eff').value)||0;
@@ -107,28 +106,33 @@
     const gas = (e > 0) ? Math.floor((d / e) * p) : 0;
     document.getElementById('gasTotal').value = gas;
 
-    // 総額計算
+    // 総額・割り勘計算
     let sum = 0;
     document.querySelectorAll('.amount-input').forEach(el => sum += parseInt(el.value)||0);
     
-    // 割り勘計算
     const split = parseInt(document.getElementById('splitCount').value);
     document.getElementById('grandTotal').innerText = sum.toLocaleString();
     document.getElementById('perPersonTotal').innerText = Math.ceil(sum / split).toLocaleString();
   });
 
-  // 送信処理（JavaScriptのみで完結）
+  // 送信処理（ShareTargetPicker使用）
   function onSend() {
     if (!liff.isLoggedIn()) {
       alert("ログインしていません。リロードしてください。");
       return;
     }
+    
+    // ShareTargetPickerが使えるか確認
+    if (!liff.isApiAvailable('shareTargetPicker')) {
+      alert("この端末・環境では「友だち選択送信」が利用できません。\nLINEアプリを最新にするか、別の端末で試してください。");
+      return;
+    }
 
     const btn = document.getElementById('sendBtn');
     btn.disabled = true;
-    btn.innerText = "送信中...";
+    btn.innerText = "送信先を選択中...";
     
-    // メッセージの組み立て
+    // メッセージ作成
     let msg = "【精算結果】\n";
     const add = (n, v) => { if(v > 0) msg += `\n■${n}: ¥${v.toLocaleString()}`; };
     
@@ -139,7 +143,11 @@
     
     const gas = parseInt(document.getElementById('gasTotal').value);
     if(gas > 0) {
-      msg += `\n■ガソリン: ¥${gas.toLocaleString()}\n(${document.getElementById('dist').value}km / ${document.getElementById('eff').value}km/L)`;
+      // ★修正ポイント：単価も表示するようにしました
+      const dist = document.getElementById('dist').value;
+      const eff = document.getElementById('eff').value;
+      const price = document.getElementById('price').value;
+      msg += `\n■ガソリン: ¥${gas.toLocaleString()}\n(${dist}km / ${eff}km/L / @${price}円)`;
     }
     
     document.querySelectorAll('.other-row').forEach(row => {
@@ -153,16 +161,30 @@
       msg += `\n1人: ¥${document.getElementById('perPersonTotal').innerText}`;
     }
 
-    // LINEのトークルームに送信
-    liff.sendMessages([{ type: 'text', text: msg }])
-      .then(() => {
-        liff.closeWindow(); // 成功したら閉じる
-      })
-      .catch((err) => {
-        alert("送信エラー: " + err);
+    // 友だち選択画面を開いて送信
+    liff.shareTargetPicker([
+      {
+        type: "text",
+        text: msg
+      }
+    ])
+    .then(function (res) {
+      if (res) {
+        // 送信成功
+        alert("送信しました！");
+        liff.closeWindow();
+      } else {
+        // 送信キャンセル
+        alert("送信をキャンセルしました。");
         btn.disabled = false;
-        btn.innerText = "再送信";
-      });
+        btn.innerText = "友だちを選んで送信";
+      }
+    })
+    .catch(function (error) {
+      alert("送信エラー: " + error);
+      btn.disabled = false;
+      btn.innerText = "友だちを選んで送信";
+    });
   }
 </script>
 </body>
