@@ -37,7 +37,7 @@
           </div>
 
           <div class="mb-3 p-2 bg-light rounded">
-            <small class="fw-bold">ガソリン (距離/燃費/単価)</small>
+            <small class="fw-bold">ガソリン (距離 / 燃費 / 単価)</small>
             <div class="input-group input-group-sm mt-1">
               <input type="number" class="form-control gas-calc" id="dist" placeholder="km">
               <input type="number" class="form-control gas-calc" id="eff" placeholder="km/L">
@@ -77,7 +77,7 @@
 
 <script>
   // ==========================================
-  // ★設定：あなたのLIFF IDを入れてください
+  // 既存のLIFF ID（設定変更済み）
   const LIFF_ID = "2008842942-XFy8Tty3"; 
   // ==========================================
 
@@ -115,22 +115,16 @@
     document.getElementById('perPersonTotal').innerText = Math.ceil(sum / split).toLocaleString();
   });
 
-  // 送信処理（ShareTargetPicker使用）
+  // 送信処理
   function onSend() {
     if (!liff.isLoggedIn()) {
       alert("ログインしていません。リロードしてください。");
       return;
     }
     
-    // ShareTargetPickerが使えるか確認
-    if (!liff.isApiAvailable('shareTargetPicker')) {
-      alert("この端末・環境では「友だち選択送信」が利用できません。\nLINEアプリを最新にするか、別の端末で試してください。");
-      return;
-    }
-
     const btn = document.getElementById('sendBtn');
     btn.disabled = true;
-    btn.innerText = "送信先を選択中...";
+    btn.innerText = "処理中...";
     
     // メッセージ作成
     let msg = "【精算結果】\n";
@@ -143,7 +137,7 @@
     
     const gas = parseInt(document.getElementById('gasTotal').value);
     if(gas > 0) {
-      // ★修正ポイント：単価も表示するようにしました
+      // ガソリン単価・燃費・距離も表示
       const dist = document.getElementById('dist').value;
       const eff = document.getElementById('eff').value;
       const price = document.getElementById('price').value;
@@ -161,30 +155,42 @@
       msg += `\n1人: ¥${document.getElementById('perPersonTotal').innerText}`;
     }
 
-    // 友だち選択画面を開いて送信
-    liff.shareTargetPicker([
-      {
-        type: "text",
-        text: msg
-      }
-    ])
-    .then(function (res) {
-      if (res) {
-        // 送信成功
-        alert("送信しました！");
+    // ★スイッチONになったので、これで動くはずです！
+    if (liff.isApiAvailable('shareTargetPicker')) {
+      liff.shareTargetPicker([{ type: "text", text: msg }])
+      .then(function (res) {
+        if (res) {
+          alert("送信しました！");
+          liff.closeWindow();
+        } else {
+          alert("キャンセルされました。");
+          btn.disabled = false;
+          btn.innerText = "友だちを選んで送信";
+        }
+      })
+      .catch(function (error) {
+        // 万が一エラーが出た場合の保険
+        console.error(error);
+        fallbackSend(msg, btn);
+      });
+    } else {
+      // 端末などが非対応の場合
+      fallbackSend(msg, btn);
+    }
+  }
+
+  // 保険の送信機能
+  function fallbackSend(msg, btn) {
+    liff.sendMessages([{ type: 'text', text: msg }])
+      .then(() => {
+        alert("【送信完了】\n友だち選択画面が開けなかったため、このトークルームに結果を送信しました。\n\n必要に応じて転送してください。");
         liff.closeWindow();
-      } else {
-        // 送信キャンセル
-        alert("送信をキャンセルしました。");
+      })
+      .catch((err) => {
+        alert("送信エラー: " + err);
         btn.disabled = false;
         btn.innerText = "友だちを選んで送信";
-      }
-    })
-    .catch(function (error) {
-      alert("送信エラー: " + error);
-      btn.disabled = false;
-      btn.innerText = "友だちを選んで送信";
-    });
+      });
   }
 </script>
 </body>
