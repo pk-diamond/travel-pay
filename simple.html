@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>簡易精算</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #fcfcfc; color: #333; font-family: sans-serif; }
+    .container { max-width: 600px; margin-top: 20px; margin-bottom: 60px; }
+    .card { border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 12px; }
+    #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+  </style>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner-border text-success mb-2" role="status"></div>
+  <div class="small text-muted">読み込み中...</div>
+</div>
+
+<div id="mainView" class="d-none">
+  <div class="container">
+    
+    <div class="mb-3">
+      <a href="index.html" class="text-decoration-none text-secondary fw-bold">
+        &lt; メニューに戻る
+      </a>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title text-center text-success mb-3 fw-bold">簡易精算フォーム</h5>
+        <form id="settlementForm">
+          
+          <div class="row g-2 mb-3">
+            <div class="col-6"><small class="fw-bold">レンタカー</small><input type="number" class="form-control amount-input" id="rentalCar" placeholder="0"></div>
+            <div class="col-6"><small class="fw-bold">高速代</small><input type="number" class="form-control amount-input" id="highway" placeholder="0"></div>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6"><small class="fw-bold">宿泊代</small><input type="number" class="form-control amount-input" id="accommodation" placeholder="0"></div>
+            <div class="col-6"><small class="fw-bold">駐車場</small><input type="number" class="form-control amount-input" id="parking" placeholder="0"></div>
+          </div>
+
+          <div class="mb-3 p-2 bg-light rounded">
+            <small class="fw-bold">ガソリン (距離 / 燃費 / 単価)</small>
+            <div class="input-group input-group-sm mt-1">
+              <input type="number" class="form-control gas-calc" id="dist" placeholder="km">
+              <input type="number" class="form-control gas-calc" id="eff" placeholder="km/L">
+              <input type="number" class="form-control gas-calc" id="price" placeholder="円">
+            </div>
+            <input type="number" class="form-control amount-input mt-2 fw-bold" id="gasTotal" readonly placeholder="合計" value="0">
+          </div>
+
+          <div id="otherItems">
+            <script>
+              for(let i=1; i<=8; i++) {
+                document.write(`<div class="input-group input-group-sm mb-2 other-row"><span class="input-group-text">他${i}</span><input type="text" class="form-control item-name"><input type="number" class="form-control amount-input" placeholder="0"></div>`);
+              }
+            </script>
+          </div>
+
+          <div class="mb-3 mt-4">
+            <label for="splitCount" class="form-label small fw-bold">何人で割りますか？</label>
+            <select class="form-select" id="splitCount">
+              <option value="1">1人</option><option value="2" selected>2人</option><option value="3">3人</option><option value="4">4人</option>
+            </select>
+          </div>
+
+          <div class="alert alert-secondary py-2 mb-3">
+            <div class="fw-bold">総額: ¥<span id="grandTotal">0</span></div>
+            <div class="small">1人: ¥<span id="perPersonTotal">0</span></div>
+          </div>
+
+          <button type="button" class="btn btn-success w-100 py-3 fw-bold" id="sendBtn" onclick="onSend()">
+            友だちを選んで送信
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const LIFF_ID = "2008842942-XFy8Tty3"; 
+
+  window.onload = function() {
+    liff.init({ liffId: LIFF_ID }).then(() => {
+      if (!liff.isLoggedIn()) {
+        liff.login();
+      } else {
+        document.getElementById('loading').classList.add('d-none');
+        document.getElementById('mainView').classList.remove('d-none');
+      }
+    });
+  };
+
+  document.addEventListener('input', function() {
+    const d = parseFloat(document.getElementById('dist').value)||0;
+    const e = parseFloat(document.getElementById('eff').value)||0;
+    const p = parseFloat(document.getElementById('price').value)||0;
+    const gas = (e > 0) ? Math.floor((d / e) * p) : 0;
+    document.getElementById('gasTotal').value = gas;
+
+    let sum = 0;
+    document.querySelectorAll('.amount-input').forEach(el => sum += parseInt(el.value)||0);
+    const split = parseInt(document.getElementById('splitCount').value);
+    document.getElementById('grandTotal').innerText = sum.toLocaleString();
+    document.getElementById('perPersonTotal').innerText = Math.ceil(sum / split).toLocaleString();
+  });
+
+  function onSend() {
+    if (!liff.isLoggedIn()) return alert("再ログインしてください");
+    
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = true; btn.innerText = "処理中...";
+    
+    let msg = "【精算結果(簡易)】\n";
+    const add = (n, v) => { if(v > 0) msg += `\n■${n}: ¥${v.toLocaleString()}`; };
+    
+    add('レンタカー', parseInt(document.getElementById('rentalCar').value));
+    add('高速', parseInt(document.getElementById('highway').value));
+    add('宿泊', parseInt(document.getElementById('accommodation').value));
+    add('駐車場', parseInt(document.getElementById('parking').value));
+    
+    const gas = parseInt(document.getElementById('gasTotal').value);
+    if(gas > 0) {
+      const dist = document.getElementById('dist').value;
+      const eff = document.getElementById('eff').value;
+      const price = document.getElementById('price').value;
+      msg += `\n■ガソリン: ¥${gas.toLocaleString()}\n(${dist}km / ${eff}km/L / @${price}円)`;
+    }
+    
+    document.querySelectorAll('.other-row').forEach(row => {
+      const name = row.querySelector('.item-name').value || 'その他';
+      const val = parseInt(row.querySelector('.amount-input').value);
+      add(name, val);
+    });
+
+    msg += `\n\n総額: ¥${document.getElementById('grandTotal').innerText}`;
+    if(document.getElementById('splitCount').value > 1) {
+      msg += `\n1人: ¥${document.getElementById('perPersonTotal').innerText}`;
+    }
+
+    if (liff.isApiAvailable('shareTargetPicker')) {
+      liff.shareTargetPicker([{ type: "text", text: msg }])
+      .then((res) => {
+        if (res) { alert("送信しました！"); liff.closeWindow(); }
+        else { alert("キャンセルしました"); btn.disabled = false; btn.innerText = "友だちを選んで送信"; }
+      })
+      .catch(() => fallbackSend(msg, btn));
+    } else {
+      fallbackSend(msg, btn);
+    }
+  }
+
+  function fallbackSend(msg, btn) {
+    liff.sendMessages([{ type: 'text', text: msg }])
+      .then(() => {
+        alert("Botとのトークルームに送信しました。転送して利用してください。");
+        liff.closeWindow();
+      })
+      .catch((err) => {
+        alert("送信エラー: " + err);
+        btn.disabled = false;
+        btn.innerText = "友だちを選んで送信";
+      });
+  }
+</script>
+</body>
+</html>
