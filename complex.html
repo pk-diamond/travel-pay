@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>詳細精算</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #fcfcfc; color: #333; font-family: sans-serif; }
+    .container { max-width: 600px; margin-top: 20px; margin-bottom: 60px; }
+    .card { border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 12px; }
+    #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+  </style>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner-border text-success mb-2" role="status"></div>
+  <div class="small text-muted">読み込み中...</div>
+</div>
+
+<div id="mainView" class="d-none">
+  <div class="container">
+    
+    <div class="mb-3">
+      <a href="index.html" class="text-decoration-none text-secondary fw-bold">
+        &lt; メニューに戻る
+      </a>
+    </div>
+
+    <div class="card p-5 text-center">
+      <h2 class="fw-bold text-secondary mb-3">🚧 工事中</h2>
+      <p class="text-muted">
+        詳細精算機能は現在開発中です。<br>
+        もうしばらくお待ちください。
+      </p>
+      <a href="index.html" class="btn btn-outline-success mt-3">
+        トップへ戻る
+      </a>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // LIFF ID (共通)
+  const LIFF_ID = "2008842942-XFy8Tty3"; 
+
+  // ページ遷移時にもLIFF初期化が必要です
+  window.onload = function() {
+    liff.init({ liffId: LIFF_ID }).then(() => {
+      // ログインチェック
+      if (!liff.isLoggedIn()) {
+        liff.login();
+      } else {
+        document.getElementById('loading').classList.add('d-none');
+        document.getElementById('mainView').classList.remove('d-none');
+      }
+    });
+  };
+</script>
+</body>
+</html>
