@@ -10,6 +10,8 @@
     .container { max-width: 600px; margin-top: 20px; margin-bottom: 60px; }
     .card { border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 12px; }
     #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+    .expense-row { background-color: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #eee; }
+    .delete-btn { color: #dc3545; cursor: pointer; font-size: 1.2rem; line-height: 1; }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -29,36 +31,293 @@
       </a>
     </div>
 
-    <div class="card p-5 text-center">
-      <h2 class="fw-bold text-secondary mb-3">🚧 工事中</h2>
-      <p class="text-muted">
-        詳細精算機能は現在開発中です。<br>
-        もうしばらくお待ちください。
-      </p>
-      <a href="index.html" class="btn btn-outline-success mt-3">
-        トップへ戻る
-      </a>
+    <div class="card mb-4">
+      <div class="card-body">
+        <h5 class="card-title text-center text-success mb-3 fw-bold">詳細精算設定</h5>
+        
+        <div class="mb-3">
+          <label class="form-label small fw-bold">旅行の人数</label>
+          <select class="form-select" id="memberCount" onchange="updateMemberInputs()">
+            <option value="2" selected>2人</option>
+            <option value="3">3人</option>
+            <option value="4">4人</option>
+          </select>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label small fw-bold">メンバーの名前</label>
+          <div id="memberNamesArea">
+            </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-body">
+        <h5 class="card-title text-center text-success mb-3 fw-bold">立替項目の入力</h5>
+        <div id="expenseList">
+          </div>
+        
+        <button type="button" class="btn btn-outline-success w-100 fw-bold" onclick="addExpenseRow()">
+          ＋ 項目を追加
+        </button>
+      </div>
+    </div>
+
+    <button type="button" class="btn btn-primary w-100 py-3 fw-bold mb-4 shadow-sm" onclick="calculate()">
+      計算する
+    </button>
+
+    <div id="resultCard" class="card mb-4 d-none bg-light border-success">
+      <div class="card-body">
+        <h5 class="fw-bold text-center text-dark mb-3">💰 精算結果</h5>
+        <div id="resultContent" class="mb-3 small"></div>
+        <button type="button" class="btn btn-success w-100 fw-bold" id="sendBtn" onclick="onSend()">
+          結果をLINEで送信
+        </button>
+      </div>
     </div>
 
   </div>
 </div>
 
 <script>
-  // LIFF ID (共通)
+  // ==========================================
+  // ★設定：LIFF ID
   const LIFF_ID = "2008842942-XFy8Tty3"; 
+  // ==========================================
 
-  // ページ遷移時にもLIFF初期化が必要です
+  let members = []; // メンバー名を保持する配列
+  let calculatedMsg = ""; // LINE送信用のメッセージ
+
   window.onload = function() {
     liff.init({ liffId: LIFF_ID }).then(() => {
-      // ログインチェック
       if (!liff.isLoggedIn()) {
         liff.login();
       } else {
         document.getElementById('loading').classList.add('d-none');
         document.getElementById('mainView').classList.remove('d-none');
+        
+        // 初期化処理
+        updateMemberInputs(); // 名前欄作成
+        addExpenseRow(); // 最初の1行を追加
       }
     });
   };
+
+  // メンバー人数変更時の処理
+  function updateMemberInputs() {
+    const count = parseInt(document.getElementById('memberCount').value);
+    const area = document.getElementById('memberNamesArea');
+    
+    // 今入力されている名前を一時保存
+    const currentNames = [];
+    document.querySelectorAll('.member-name-input').forEach(input => currentNames.push(input.value));
+
+    area.innerHTML = "";
+    members = [];
+
+    for(let i=0; i<count; i++) {
+      const defaultName = currentNames[i] || `メンバー${i+1}`;
+      members.push(defaultName);
+      
+      const div = document.createElement('div');
+      div.className = "input-group mb-2";
+      div.innerHTML = `
+        <span class="input-group-text bg-white small">メンバー${i+1}</span>
+        <input type="text" class="form-control member-name-input" 
+          value="${defaultName}" 
+          data-index="${i}" 
+          oninput="onNameChange(${i}, this.value)" 
+          placeholder="名前を入力">
+      `;
+      area.appendChild(div);
+    }
+    
+    // 全項目のプルダウンを更新
+    refreshAllPayerSelects();
+  }
+
+  // 名前入力時にプルダウンの表記をリアルタイム更新
+  function onNameChange(index, newName) {
+    members[index] = newName || `メンバー${index+1}`;
+    
+    // 全ての支払者プルダウンの選択肢テキストを更新
+    document.querySelectorAll('.payer-select').forEach(select => {
+      // select.options[index] はメンバー順と連動している
+      if(select.options[index]) {
+        select.options[index].text = members[index];
+      }
+    });
+  }
+
+  // 支払者プルダウンの選択肢を再生成（人数変更時など）
+  function refreshAllPayerSelects() {
+    document.querySelectorAll('.payer-select').forEach(select => {
+      const currentVal = select.value; // 今選ばれている値を記憶
+      select.innerHTML = "";
+      members.forEach((name, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx; // 値はインデックス(0,1,2...)
+        opt.text = name;
+        select.appendChild(opt);
+      });
+      // 可能なら元の選択状態に戻す（人数が減った場合は0に戻る）
+      select.value = (currentVal < members.length) ? currentVal : 0;
+    });
+  }
+
+  // 経費項目の行を追加
+  function addExpenseRow() {
+    const list = document.getElementById('expenseList');
+    const div = document.createElement('div');
+    div.className = "expense-row";
+    
+    // 支払者プルダウンの作成
+    let options = "";
+    members.forEach((name, idx) => {
+      options += `<option value="${idx}">${name}</option>`;
+    });
+
+    div.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <input type="text" class="form-control form-control-sm me-2 item-name" placeholder="項目名 (例: チケット代)">
+        <span class="delete-btn" onclick="this.parentElement.parentElement.remove()">×</span>
+      </div>
+      <div class="input-group">
+        <select class="form-select payer-select" style="max-width: 40%;">${options}</select>
+        <input type="number" class="form-control amount-input" placeholder="金額">
+      </div>
+    `;
+    list.appendChild(div);
+  }
+
+  // ■■ 計算ロジック（重要） ■■
+  function calculate() {
+    // 1. 各メンバーの支払額を集計
+    const payments = new Array(members.length).fill(0);
+    let totalAmount = 0;
+    
+    // 項目リスト作成（送信メッセージ用）
+    let itemsText = "";
+
+    document.querySelectorAll('.expense-row').forEach(row => {
+      const name = row.querySelector('.item-name').value || "未入力項目";
+      const payerIdx = parseInt(row.querySelector('.payer-select').value);
+      const amount = parseInt(row.querySelector('.amount-input').value) || 0;
+      
+      if (amount > 0) {
+        payments[payerIdx] += amount;
+        totalAmount += amount;
+        itemsText += `・${name}: ${amount.toLocaleString()}円 (${members[payerIdx]})\n`;
+      }
+    });
+
+    if (totalAmount === 0) {
+      alert("金額が入力されていません。");
+      return;
+    }
+
+    // 2. 一人あたりの負担額を計算
+    const memberCount = members.length;
+    const baseShare = Math.floor(totalAmount / memberCount); // 基本負担額
+    const remainder = totalAmount % memberCount; // 余り（端数）
+
+    // 3. 各メンバーの収支を計算 (+:受け取る, -:支払う)
+    // 余りの数だけ、リストの上から順に1円多く負担させる（ことで端数を消す）
+    const balances = payments.map((paid, idx) => {
+      const burden = baseShare + (idx < remainder ? 1 : 0);
+      return {
+        id: idx,
+        name: members[idx],
+        balance: paid - burden // プラスなら受け取り、マイナスなら支払い
+      };
+    });
+
+    // 4. 精算マッチング（貪欲法で回数を減らす）
+    const creditors = balances.filter(b => b.balance > 0).sort((a,b) => b.balance - a.balance); // 受け取る人(多い順)
+    const debtors = balances.filter(b => b.balance < 0).sort((a,b) => a.balance - b.balance); // 支払う人(負の大きい順)
+
+    let transactions = [];
+    let creditorIdx = 0;
+    let debtorIdx = 0;
+
+    while (creditorIdx < creditors.length && debtorIdx < debtors.length) {
+      const cred = creditors[creditorIdx];
+      const debt = debtors[debtorIdx];
+      
+      // 移動させる金額（受け取り残額と、支払い残額の小さい方）
+      const amount = Math.min(cred.balance, Math.abs(debt.balance));
+      
+      if (amount > 0) {
+        transactions.push({
+          from: debt.name,
+          to: cred.name,
+          amount: amount
+        });
+      }
+
+      // 残高更新
+      cred.balance -= amount;
+      debt.balance += amount; // 負の値に足すので0に近づく
+
+      // 0になったら次の人へ
+      if (Math.abs(cred.balance) < 1) creditorIdx++;
+      if (Math.abs(debt.balance) < 1) debtorIdx++;
+    }
+
+    // 5. 結果表示
+    let resultHTML = `<div class="fw-bold mb-2">総額: ¥${totalAmount.toLocaleString()}</div>`;
+    resultHTML += `<div class="mb-3 border-bottom pb-2">1人あたり: 約¥${baseShare.toLocaleString()}</div>`;
+    
+    // メッセージ生成
+    calculatedMsg = `【詳細精算結果】\n\n`;
+    calculatedMsg += `■総額: ¥${totalAmount.toLocaleString()}\n`;
+    calculatedMsg += `■1人あたり: 約¥${baseShare.toLocaleString()}\n\n`;
+    calculatedMsg += `[内訳]\n${itemsText}\n`;
+    calculatedMsg += `----------------\n【精算方法】\n`;
+
+    if (transactions.length === 0) {
+      resultHTML += `<div class="text-success fw-bold">精算なし（全員ぴったりです！）</div>`;
+      calculatedMsg += `精算なし（全員等しく支払いました）\n`;
+    } else {
+      transactions.forEach(t => {
+        const line = `👉 ${t.from} さん は\n   ${t.to} さん に ¥${t.amount.toLocaleString()} 渡す`;
+        resultHTML += `<div class="alert alert-warning py-2 mb-2 text-dark">${line.replace(/\n/g, '<br>')}</div>`;
+        calculatedMsg += `● ${t.from} → ${t.to} : ¥${t.amount.toLocaleString()}\n`;
+      });
+    }
+    calculatedMsg += `----------------`;
+
+    document.getElementById('resultContent').innerHTML = resultHTML;
+    document.getElementById('resultCard').classList.remove('d-none');
+    
+    // 計算結果の場所へスクロール
+    document.getElementById('resultCard').scrollIntoView({behavior: "smooth"});
+  }
+
+  // LINE送信
+  function onSend() {
+    if (!calculatedMsg) return;
+    
+    if (liff.isApiAvailable('shareTargetPicker')) {
+      liff.shareTargetPicker([{ type: "text", text: calculatedMsg }])
+      .then(res => {
+        if (res) { alert("送信しました！"); liff.closeWindow(); }
+      })
+      .catch(() => fallbackSend());
+    } else {
+      fallbackSend();
+    }
+  }
+
+  function fallbackSend() {
+    liff.sendMessages([{ type: 'text', text: calculatedMsg }])
+    .then(() => {
+      alert("Botに送信しました。転送して共有してください。");
+      liff.closeWindow();
+    });
+  }
 </script>
 </body>
 </html>
