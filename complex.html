@@ -75,21 +75,25 @@
 <script>
   // ==========================================
   const LIFF_ID = "2008842942-XFy8Tty3"; 
-  // ★ここにGASのURLを貼ってください
+  // ★GASのURLを貼ってください
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxK0YaFYVlqwa0F_foz-2WlguFEyrpry1dvKJ6vmDGdPkpWlfDsaWb9vQuaiHdRMC1n/exec"; 
   // ==========================================
 
   let members = [];
   let calculatedMsg = "";
-  let logData = {}; // GAS送信用のデータ入れ
+  let logData = {}; 
   let displayName = "不明";
+  let userId = "";
 
   window.onload = function() {
     liff.init({ liffId: LIFF_ID }).then(() => {
       if (!liff.isLoggedIn()) {
         liff.login();
       } else {
-        liff.getProfile().then(p => displayName = p.displayName);
+        liff.getProfile().then(p => {
+          displayName = p.displayName;
+          userId = p.userId; // ★ID取得
+        });
         document.getElementById('loading').classList.add('d-none');
         document.getElementById('mainView').classList.remove('d-none');
         updateMemberInputs();
@@ -159,9 +163,9 @@
   function calculate() {
     const payments = new Array(members.length).fill(0);
     let totalAmount = 0;
-    let itemsText = ""; // LINE用
-    let detailText = ""; // ログ用(I列)
-    let detailsArr = []; // ログ用(H列JSON)
+    let itemsText = ""; 
+    let detailText = ""; 
+    let detailsArr = []; 
 
     document.querySelectorAll('.expense-row').forEach(row => {
       const name = row.querySelector('.item-name').value || "未入力項目";
@@ -204,7 +208,6 @@
 
     const destination = document.getElementById('destination').value || "未入力";
     
-    // LINEメッセージ作成
     calculatedMsg = `【詳細精算: ${destination}】\n\n`;
     calculatedMsg += `■総額: ¥${totalAmount.toLocaleString()}\n`;
     calculatedMsg += `■1人あたり: 約¥${baseShare.toLocaleString()}\n\n`;
@@ -228,10 +231,10 @@
     document.getElementById('resultCard').classList.remove('d-none');
     document.getElementById('resultCard').scrollIntoView({behavior: "smooth"});
 
-    // ログデータ準備
     logData = {
       type: "詳細精算",
       user: displayName,
+      userId: userId, // ★ID送信
       destination: destination,
       total: totalAmount,
       count: memberCount,
@@ -245,7 +248,6 @@
     if (!calculatedMsg) return;
     const btn = document.getElementById('sendBtn');
     
-    // ★GASへログ送信
     fetch(GAS_URL, {
       method: "POST",
       mode: "no-cors",
