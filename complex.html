@@ -45,8 +45,9 @@
             <option value="4">4人</option>
           </select>
         </div>
+        
         <div class="mb-2">
-          <label class="form-label small fw-bold">メンバーの名前</label>
+          <label class="form-label small fw-bold">メンバーの名前 <span class="badge bg-danger">必須</span></label>
           <div id="memberNamesArea"></div>
         </div>
       </div>
@@ -75,7 +76,6 @@
 <script>
   // ==========================================
   const LIFF_ID = "2008842942-XFy8Tty3"; 
-  // ★GASのURLを貼ってください
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxK0YaFYVlqwa0F_foz-2WlguFEyrpry1dvKJ6vmDGdPkpWlfDsaWb9vQuaiHdRMC1n/exec"; 
   // ==========================================
 
@@ -92,7 +92,7 @@
       } else {
         liff.getProfile().then(p => {
           displayName = p.displayName;
-          userId = p.userId; // ★ID取得
+          userId = p.userId;
         });
         document.getElementById('loading').classList.add('d-none');
         document.getElementById('mainView').classList.remove('d-none');
@@ -102,6 +102,7 @@
     });
   };
 
+  // ★修正：名前欄をプレースホルダー化し、デフォルト値を空にする
   function updateMemberInputs() {
     const count = parseInt(document.getElementById('memberCount').value);
     const area = document.getElementById('memberNamesArea');
@@ -112,20 +113,26 @@
     members = [];
 
     for(let i=0; i<count; i++) {
-      const defaultName = currentNames[i] || `メンバー${i+1}`;
-      members.push(defaultName);
+      // 既に入力があればそれを使い、なければ空文字にする
+      const val = currentNames[i] || "";
+      members.push(val); // 内部データも空で初期化
+      
       const div = document.createElement('div');
       div.className = "input-group mb-2";
-      div.innerHTML = `<span class="input-group-text bg-white small">メンバー${i+1}</span><input type="text" class="form-control member-name-input" value="${defaultName}" oninput="onNameChange(${i}, this.value)">`;
+      // value属性は入力値(val)を設定、placeholderに見本を表示
+      div.innerHTML = `<span class="input-group-text bg-white small">メンバー${i+1}</span><input type="text" class="form-control member-name-input" value="${val}" placeholder="名前を入力" oninput="onNameChange(${i}, this.value)">`;
       area.appendChild(div);
     }
     refreshAllPayerSelects();
   }
 
   function onNameChange(index, newName) {
-    members[index] = newName || `メンバー${index+1}`;
+    members[index] = newName; // 入力内容をそのまま保存（空なら空のまま）
     document.querySelectorAll('.payer-select').forEach(select => {
-      if(select.options[index]) select.options[index].text = members[index];
+      // プルダウンの表示更新（空ならプレースホルダーを表示）
+      if(select.options[index]) {
+        select.options[index].text = newName || `(メンバー${index+1})`;
+      }
     });
   }
 
@@ -135,7 +142,9 @@
       select.innerHTML = "";
       members.forEach((name, idx) => {
         const opt = document.createElement('option');
-        opt.value = idx; opt.text = name;
+        opt.value = idx; 
+        // 名前が空なら "(メンバーX)" と表示しておく
+        opt.text = name || `(メンバー${idx+1})`;
         select.appendChild(opt);
       });
       select.value = (currentVal < members.length) ? currentVal : 0;
@@ -147,7 +156,10 @@
     const div = document.createElement('div');
     div.className = "expense-row";
     let options = "";
-    members.forEach((name, idx) => options += `<option value="${idx}">${name}</option>`);
+    members.forEach((name, idx) => {
+        // ここでも名前が空なら仮名を表示
+        options += `<option value="${idx}">${name || `(メンバー${idx+1})`}</option>`
+    });
     div.innerHTML = `
       <div class="d-flex justify-content-between align-items-center mb-2">
         <input type="text" class="form-control form-control-sm me-2 item-name" placeholder="項目名">
@@ -161,6 +173,14 @@
   }
 
   function calculate() {
+    // ★追加：バリデーションチェック（名前未入力の検知）
+    // 空文字または空白のみの名前がないかチェック
+    const emptyMemberIndex = members.findIndex(m => !m || m.trim() === "");
+    if (emptyMemberIndex !== -1) {
+        alert(`メンバー${emptyMemberIndex + 1}の名前が入力されていません。\n全員の名前を入力してください。`);
+        return; // 計算を中断
+    }
+
     const payments = new Array(members.length).fill(0);
     let totalAmount = 0;
     let itemsText = ""; 
@@ -234,7 +254,7 @@
     logData = {
       type: "詳細精算",
       user: displayName,
-      userId: userId, // ★ID送信
+      userId: userId,
       destination: destination,
       total: totalAmount,
       count: memberCount,
