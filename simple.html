@@ -22,11 +22,8 @@
 
 <div id="mainView" class="d-none">
   <div class="container">
-    
     <div class="mb-3">
-      <a href="index.html" class="text-decoration-none text-secondary fw-bold">
-        &lt; メニューに戻る
-      </a>
+      <a href="index.html" class="text-decoration-none text-secondary fw-bold">&lt; メニューに戻る</a>
     </div>
 
     <div class="card">
@@ -34,6 +31,11 @@
         <h5 class="card-title text-center text-success mb-3 fw-bold">簡易精算フォーム</h5>
         <form id="settlementForm">
           
+          <div class="mb-4">
+            <label class="form-label small fw-bold">旅行の行き先</label>
+            <input type="text" class="form-control" id="destination" placeholder="例：箱根温泉">
+          </div>
+
           <div class="row g-2 mb-3">
             <div class="col-6"><small class="fw-bold">レンタカー</small><input type="number" class="form-control amount-input" id="rentalCar" placeholder="0"></div>
             <div class="col-6"><small class="fw-bold">高速代</small><input type="number" class="form-control amount-input" id="highway" placeholder="0"></div>
@@ -44,7 +46,7 @@
           </div>
 
           <div class="mb-3 p-2 bg-light rounded">
-            <small class="fw-bold">ガソリン (距離 / 燃費 / 単価)</small>
+            <small class="fw-bold">ガソリン (距離/燃費/単価)</small>
             <div class="input-group input-group-sm mt-1">
               <input type="number" class="form-control gas-calc" id="dist" placeholder="km">
               <input type="number" class="form-control gas-calc" id="eff" placeholder="km/L">
@@ -55,9 +57,7 @@
 
           <div id="otherItems">
             <script>
-              for(let i=1; i<=8; i++) {
-                document.write(`<div class="input-group input-group-sm mb-2 other-row"><span class="input-group-text">他${i}</span><input type="text" class="form-control item-name"><input type="number" class="form-control amount-input" placeholder="0"></div>`);
-              }
+              for(let i=1; i<=8; i++) document.write(`<div class="input-group input-group-sm mb-2 other-row"><span class="input-group-text">他${i}</span><input type="text" class="form-control item-name"><input type="number" class="form-control amount-input" placeholder="0"></div>`);
             </script>
           </div>
 
@@ -83,13 +83,22 @@
 </div>
 
 <script>
+  // ==========================================
   const LIFF_ID = "2008842942-XFy8Tty3"; 
+  // ★ここに「ステップ2」で発行したGASのURLを貼ってください
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbxK0YaFYVlqwa0F_foz-2WlguFEyrpry1dvKJ6vmDGdPkpWlfDsaWb9vQuaiHdRMC1n/exec"; 
+  // ==========================================
+
+  let displayName = "不明";
 
   window.onload = function() {
     liff.init({ liffId: LIFF_ID }).then(() => {
       if (!liff.isLoggedIn()) {
         liff.login();
       } else {
+        liff.getProfile().then(profile => {
+          displayName = profile.displayName; // 名前を取得
+        });
         document.getElementById('loading').classList.add('d-none');
         document.getElementById('mainView').classList.remove('d-none');
       }
@@ -116,8 +125,23 @@
     const btn = document.getElementById('sendBtn');
     btn.disabled = true; btn.innerText = "処理中...";
     
-    let msg = "【精算結果(簡易)】\n";
-    const add = (n, v) => { if(v > 0) msg += `\n■${n}: ¥${v.toLocaleString()}`; };
+    // データ収集
+    const destination = document.getElementById('destination').value || "未入力";
+    const totalAmount = document.getElementById('grandTotal').innerText.replace(/,/g, '');
+    const splitCount = document.getElementById('splitCount').value;
+    const perPerson = document.getElementById('perPersonTotal').innerText;
+
+    // メッセージ＆ログ用テキスト作成
+    let msg = `【簡易精算: ${destination}】\n`;
+    let detailText = ""; // スプシ用(人間用)
+
+    const add = (n, v) => { 
+      if(v > 0) {
+        const line = `■${n}: ¥${v.toLocaleString()}`;
+        msg += `\n${line}`;
+        detailText += `・${n}: ${v}円\n`;
+      }
+    };
     
     add('レンタカー', parseInt(document.getElementById('rentalCar').value));
     add('高速', parseInt(document.getElementById('highway').value));
@@ -129,7 +153,9 @@
       const dist = document.getElementById('dist').value;
       const eff = document.getElementById('eff').value;
       const price = document.getElementById('price').value;
-      msg += `\n■ガソリン: ¥${gas.toLocaleString()}\n(${dist}km / ${eff}km/L / @${price}円)`;
+      const info = `(${dist}km / ${eff}km/L / @${price}円)`;
+      msg += `\n■ガソリン: ¥${gas.toLocaleString()}\n${info}`;
+      detailText += `・ガソリン: ${gas}円 ${info}\n`;
     }
     
     document.querySelectorAll('.other-row').forEach(row => {
@@ -138,34 +164,40 @@
       add(name, val);
     });
 
-    msg += `\n\n総額: ¥${document.getElementById('grandTotal').innerText}`;
-    if(document.getElementById('splitCount').value > 1) {
-      msg += `\n1人: ¥${document.getElementById('perPersonTotal').innerText}`;
-    }
+    const summary = `総額: ¥${parseInt(totalAmount).toLocaleString()} (1人: ¥${perPerson})`;
+    msg += `\n\n${summary}`;
 
+    // ★GASへログ送信 (非同期で送信し、待たずにLINE送信へ進む)
+    const logData = {
+      type: "簡易精算",
+      user: displayName,
+      destination: destination,
+      total: totalAmount,
+      count: splitCount,
+      summary: summary,
+      textDetail: detailText, // I列用
+      jsonDetail: JSON.stringify({ raw: "detail_data_here" }) // H列用(簡略化)
+    };
+    
+    // GASへ送信（送信成功を待たずにUIを進める）
+    fetch(GAS_URL, {
+      method: "POST",
+      mode: "no-cors", // これがないとブラウザでエラーになる
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(logData)
+    });
+
+    // LINE送信処理
     if (liff.isApiAvailable('shareTargetPicker')) {
       liff.shareTargetPicker([{ type: "text", text: msg }])
       .then((res) => {
         if (res) { alert("送信しました！"); liff.closeWindow(); }
         else { alert("キャンセルしました"); btn.disabled = false; btn.innerText = "友だちを選んで送信"; }
-      })
-      .catch(() => fallbackSend(msg, btn));
-    } else {
-      fallbackSend(msg, btn);
-    }
-  }
-
-  function fallbackSend(msg, btn) {
-    liff.sendMessages([{ type: 'text', text: msg }])
-      .then(() => {
-        alert("Botとのトークルームに送信しました。転送して利用してください。");
-        liff.closeWindow();
-      })
-      .catch((err) => {
-        alert("送信エラー: " + err);
-        btn.disabled = false;
-        btn.innerText = "友だちを選んで送信";
       });
+    } else {
+      liff.sendMessages([{ type: 'text', text: msg }])
+      .then(() => { alert("Botに送信しました。"); liff.closeWindow(); });
+    }
   }
 </script>
 </body>
