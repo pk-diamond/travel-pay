@@ -222,7 +222,8 @@
     row.querySelector('.amount-input').value = (total > 0) ? total : "";
   }
 
-  function calculate() {
+
+function calculate() {
     // バリデーション
     const emptyMemberIndex = members.findIndex(m => !m || m.trim() === "");
     if (emptyMemberIndex !== -1) {
@@ -258,7 +259,7 @@
             item: name, 
             payer: members[payerIdx], 
             amount: amount,
-            gasDetails: { dist: d, eff: e, price: p } // 詳細ログ用
+            gasDetails: { dist: d, eff: e, price: p } 
           });
         } else {
           // 通常行
@@ -271,7 +272,13 @@
 
     if (totalAmount === 0) return alert("金額が入力されていません。");
 
-    // 以下、精算ロジックは同じ
+    // ■■ 追加：メンバーごとの支払合計リストを作成 ■■
+    let memberTotals = "";
+    members.forEach((name, idx) => {
+      memberTotals += `・${name}: ¥${payments[idx].toLocaleString()}\n`;
+    });
+
+    // 精算ロジック
     const memberCount = members.length;
     const baseShare = Math.floor(totalAmount / memberCount);
     const remainder = totalAmount % memberCount;
@@ -297,10 +304,16 @@
 
     const destination = document.getElementById('destination').value || "未入力";
     
+    // ■■ メッセージ作成（ここに追加しました） ■■
     calculatedMsg = `【詳細精算: ${destination}】\n\n`;
     calculatedMsg += `■総額: ¥${totalAmount.toLocaleString()}\n`;
     calculatedMsg += `■1人あたり: 約¥${baseShare.toLocaleString()}\n\n`;
+    
     calculatedMsg += `[内訳]\n${itemsText}\n`;
+    
+    // ★ここに追加：メンバーごとの支払額
+    calculatedMsg += `[メンバー別支払額]\n${memberTotals}\n`;
+
     calculatedMsg += `----------------\n【精算方法】\n`;
 
     let resultSummary = "";
@@ -332,7 +345,7 @@
       jsonDetail: JSON.stringify(detailsArr)
     };
   }
-
+  
   function onSend() {
     if (!calculatedMsg) return;
     
