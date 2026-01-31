@@ -11,6 +11,7 @@
     .card { border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 12px; }
     #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
     .expense-row { background-color: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #eee; }
+    .gas-row { background-color: #e3f2fd; border-color: #bbdefb; } /* ガソリン行は少し青くする */
     .delete-btn { color: #dc3545; cursor: pointer; font-size: 1.2rem; line-height: 1; }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -57,7 +58,19 @@
       <div class="card-body">
         <h5 class="card-title text-center text-success mb-3 fw-bold">立替項目の入力</h5>
         <div id="expenseList"></div>
-        <button type="button" class="btn btn-outline-success w-100 fw-bold" onclick="addExpenseRow()">＋ 項目を追加</button>
+        
+        <div class="row g-2 mt-2">
+          <div class="col-6">
+            <button type="button" class="btn btn-outline-secondary w-100 fw-bold small" onclick="addExpenseRow()">
+              ＋ 通常項目
+            </button>
+          </div>
+          <div class="col-6">
+            <button type="button" class="btn btn-outline-primary w-100 fw-bold small" onclick="addGasolineRow()">
+              ＋ ガソリン
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -97,12 +110,12 @@
         document.getElementById('loading').classList.add('d-none');
         document.getElementById('mainView').classList.remove('d-none');
         updateMemberInputs();
-        addExpenseRow();
+        // 初期表示は空にしておく（またはaddExpenseRow()を1つ呼んでも良い）
+        addExpenseRow(); 
       }
     });
   };
 
-  // ★修正：名前欄をプレースホルダー化し、デフォルト値を空にする
   function updateMemberInputs() {
     const count = parseInt(document.getElementById('memberCount').value);
     const area = document.getElementById('memberNamesArea');
@@ -113,13 +126,10 @@
     members = [];
 
     for(let i=0; i<count; i++) {
-      // 既に入力があればそれを使い、なければ空文字にする
       const val = currentNames[i] || "";
-      members.push(val); // 内部データも空で初期化
-      
+      members.push(val);
       const div = document.createElement('div');
       div.className = "input-group mb-2";
-      // value属性は入力値(val)を設定、placeholderに見本を表示
       div.innerHTML = `<span class="input-group-text bg-white small">メンバー${i+1}</span><input type="text" class="form-control member-name-input" value="${val}" placeholder="名前を入力" oninput="onNameChange(${i}, this.value)">`;
       area.appendChild(div);
     }
@@ -127,9 +137,8 @@
   }
 
   function onNameChange(index, newName) {
-    members[index] = newName; // 入力内容をそのまま保存（空なら空のまま）
+    members[index] = newName;
     document.querySelectorAll('.payer-select').forEach(select => {
-      // プルダウンの表示更新（空ならプレースホルダーを表示）
       if(select.options[index]) {
         select.options[index].text = newName || `(メンバー${index+1})`;
       }
@@ -143,7 +152,6 @@
       members.forEach((name, idx) => {
         const opt = document.createElement('option');
         opt.value = idx; 
-        // 名前が空なら "(メンバーX)" と表示しておく
         opt.text = name || `(メンバー${idx+1})`;
         select.appendChild(opt);
       });
@@ -151,13 +159,13 @@
     });
   }
 
+  // ■ 通常項目の追加
   function addExpenseRow() {
     const list = document.getElementById('expenseList');
     const div = document.createElement('div');
-    div.className = "expense-row";
+    div.className = "expense-row normal-row"; // 識別用クラス
     let options = "";
     members.forEach((name, idx) => {
-        // ここでも名前が空なら仮名を表示
         options += `<option value="${idx}">${name || `(メンバー${idx+1})`}</option>`
     });
     div.innerHTML = `
@@ -172,13 +180,54 @@
     list.appendChild(div);
   }
 
+  // ■ ガソリン項目の追加
+  function addGasolineRow() {
+    const list = document.getElementById('expenseList');
+    const div = document.createElement('div');
+    div.className = "expense-row gas-row"; // 識別用クラス
+    let options = "";
+    members.forEach((name, idx) => {
+        options += `<option value="${idx}">${name || `(メンバー${idx+1})`}</option>`
+    });
+    div.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <input type="text" class="form-control form-control-sm me-2 item-name" value="ガソリン" placeholder="項目名">
+        <span class="delete-btn" onclick="this.parentElement.parentElement.remove()">×</span>
+      </div>
+      
+      <div class="input-group input-group-sm mb-2">
+        <input type="number" class="form-control gas-dist" placeholder="距離km" oninput="calcGasRow(this)">
+        <input type="number" class="form-control gas-eff" placeholder="燃費" oninput="calcGasRow(this)">
+        <input type="number" class="form-control gas-price" placeholder="単価" oninput="calcGasRow(this)">
+      </div>
+
+      <div class="input-group">
+        <select class="form-select payer-select" style="max-width: 40%;">${options}</select>
+        <input type="number" class="form-control amount-input fw-bold bg-white" placeholder="金額" readonly>
+      </div>`;
+    list.appendChild(div);
+  }
+
+  // ガソリン行の自動計算
+  function calcGasRow(input) {
+    const row = input.closest('.expense-row');
+    const d = parseFloat(row.querySelector('.gas-dist').value) || 0;
+    const e = parseFloat(row.querySelector('.gas-eff').value) || 0;
+    const p = parseFloat(row.querySelector('.gas-price').value) || 0;
+    
+    let total = 0;
+    if (e > 0) {
+      total = Math.floor((d / e) * p);
+    }
+    row.querySelector('.amount-input').value = (total > 0) ? total : "";
+  }
+
   function calculate() {
-    // ★追加：バリデーションチェック（名前未入力の検知）
-    // 空文字または空白のみの名前がないかチェック
+    // バリデーション
     const emptyMemberIndex = members.findIndex(m => !m || m.trim() === "");
     if (emptyMemberIndex !== -1) {
         alert(`メンバー${emptyMemberIndex + 1}の名前が入力されていません。\n全員の名前を入力してください。`);
-        return; // 計算を中断
+        return; 
     }
 
     const payments = new Array(members.length).fill(0);
@@ -195,14 +244,34 @@
       if (amount > 0) {
         payments[payerIdx] += amount;
         totalAmount += amount;
-        itemsText += `・${name}: ${amount.toLocaleString()}円 (${members[payerIdx]})\n`;
-        detailText += `・${name}: ${amount}円 (${members[payerIdx]})\n`;
-        detailsArr.push({ item: name, payer: members[payerIdx], amount: amount });
+
+        // ガソリン行かどうかで処理を分ける
+        if (row.classList.contains('gas-row')) {
+          const d = row.querySelector('.gas-dist').value;
+          const e = row.querySelector('.gas-eff').value;
+          const p = row.querySelector('.gas-price').value;
+          const gasInfo = `(${d}km / ${e}km/L / @${p}円)`;
+          
+          itemsText += `・${name}: ${amount.toLocaleString()}円 (${members[payerIdx]})\n  ${gasInfo}\n`;
+          detailText += `・${name}: ${amount}円 (${members[payerIdx]}) ${gasInfo}\n`;
+          detailsArr.push({ 
+            item: name, 
+            payer: members[payerIdx], 
+            amount: amount,
+            gasDetails: { dist: d, eff: e, price: p } // 詳細ログ用
+          });
+        } else {
+          // 通常行
+          itemsText += `・${name}: ${amount.toLocaleString()}円 (${members[payerIdx]})\n`;
+          detailText += `・${name}: ${amount}円 (${members[payerIdx]})\n`;
+          detailsArr.push({ item: name, payer: members[payerIdx], amount: amount });
+        }
       }
     });
 
     if (totalAmount === 0) return alert("金額が入力されていません。");
 
+    // 以下、精算ロジックは同じ
     const memberCount = members.length;
     const baseShare = Math.floor(totalAmount / memberCount);
     const remainder = totalAmount % memberCount;
@@ -266,7 +335,6 @@
 
   function onSend() {
     if (!calculatedMsg) return;
-    const btn = document.getElementById('sendBtn');
     
     fetch(GAS_URL, {
       method: "POST",
