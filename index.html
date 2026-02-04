@@ -8,24 +8,42 @@
   <style>
     body { background-color: #fcfcfc; color: #333; font-family: sans-serif; }
     .container { max-width: 600px; margin-top: 40px; margin-bottom: 60px; }
-    .menu-card { border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px; transition: transform 0.2s; }
+    /* カードのデザイン調整: タップしやすいように */
+    .menu-card { 
+      border: none; 
+      box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+      border-radius: 12px; 
+      padding: 20px; 
+      text-align: center; 
+      margin-bottom: 20px; 
+      transition: transform 0.2s; 
+      cursor: pointer;
+    }
     .menu-card:active { transform: scale(0.98); }
-    #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+    /* ローディング画面 */
+    #loading { 
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+      background: #fff; z-index: 9999; 
+      display: flex; align-items: center; justify-content: center; flex-direction: column; 
+    }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
 
+<!-- ローディング表示 -->
 <div id="loading">
   <div class="spinner-border text-success mb-2" role="status"></div>
   <div class="small text-muted">読み込み中...</div>
 </div>
 
+<!-- メインコンテンツ -->
 <div id="mainView" class="d-none">
   <div class="container">
     <h4 class="text-center fw-bold mb-4 text-success">旅行精算メニュー</h4>
     <p class="text-center text-muted small mb-4">精算方法を選択してください</p>
 
+    <!-- 簡易精算ボタン -->
     <a href="simple.html" class="text-decoration-none">
       <div class="card menu-card bg-white">
         <h5 class="fw-bold text-success mb-2">🚗 簡易精算</h5>
@@ -33,6 +51,7 @@
       </div>
     </a>
 
+    <!-- 詳細精算ボタン -->
     <a href="complex.html" class="text-decoration-none">
       <div class="card menu-card bg-light border">
         <h5 class="fw-bold text-secondary mb-2">📊 詳細精算</h5>
@@ -44,18 +63,32 @@
 </div>
 
 <script>
-  const LIFF_ID = "2008842942-XFy8Tty3"; 
+  // ==========================================
+  // 設定セクション
+  // ==========================================
+  const CONFIG = {
+    LIFF_ID: "2008842942-XFy8Tty3" // ★必要に応じて変更してください
+  };
 
+  // ==========================================
+  // 初期化処理
+  // ==========================================
   window.onload = function() {
-    liff.init({ liffId: LIFF_ID }).then(() => {
-      // ログイン状態を確認して画面を表示
-      if (!liff.isLoggedIn()) {
-        liff.login();
-      } else {
-        document.getElementById('loading').classList.add('d-none');
-        document.getElementById('mainView').classList.remove('d-none');
-      }
-    });
+    liff.init({ liffId: CONFIG.LIFF_ID })
+      .then(() => {
+        // ログインしていない場合はログイン画面へ誘導
+        if (!liff.isLoggedIn()) {
+          liff.login();
+        } else {
+          // ログイン済みなら画面を表示
+          document.getElementById('loading').classList.add('d-none');
+          document.getElementById('mainView').classList.remove('d-none');
+        }
+      })
+      .catch((err) => {
+        console.error('LIFF Init Failed', err);
+        alert('LINEログインの初期化に失敗しました。通信環境を確認してください。');
+      });
   };
 </script>
 </body>
