@@ -10,6 +10,7 @@
     .container { max-width: 600px; margin-top: 20px; margin-bottom: 60px; }
     .card { border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 12px; }
     #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+    .fw-bold-label { font-size: 0.85rem; font-weight: bold; }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -22,6 +23,7 @@
 
 <div id="mainView" class="d-none">
   <div class="container">
+    <!-- ナビゲーション -->
     <div class="mb-3">
       <a href="index.html" class="text-decoration-none text-secondary fw-bold">&lt; メニューに戻る</a>
     </div>
@@ -31,22 +33,25 @@
         <h5 class="card-title text-center text-success mb-3 fw-bold">簡易精算フォーム</h5>
         <form id="settlementForm">
           
+          <!-- 行き先 -->
           <div class="mb-4">
-            <label class="form-label small fw-bold">旅行の行き先</label>
+            <label class="form-label fw-bold-label">旅行の行き先</label>
             <input type="text" class="form-control" id="destination" placeholder="例：箱根温泉">
           </div>
 
+          <!-- 固定項目 -->
           <div class="row g-2 mb-3">
-            <div class="col-6"><small class="fw-bold">レンタカー</small><input type="number" class="form-control amount-input" id="rentalCar" placeholder="0"></div>
-            <div class="col-6"><small class="fw-bold">高速代</small><input type="number" class="form-control amount-input" id="highway" placeholder="0"></div>
+            <div class="col-6"><label class="fw-bold-label">レンタカー</label><input type="number" class="form-control amount-input" id="rentalCar" placeholder="0"></div>
+            <div class="col-6"><label class="fw-bold-label">高速代</label><input type="number" class="form-control amount-input" id="highway" placeholder="0"></div>
           </div>
           <div class="row g-2 mb-3">
-            <div class="col-6"><small class="fw-bold">宿泊代</small><input type="number" class="form-control amount-input" id="accommodation" placeholder="0"></div>
-            <div class="col-6"><small class="fw-bold">駐車場</small><input type="number" class="form-control amount-input" id="parking" placeholder="0"></div>
+            <div class="col-6"><label class="fw-bold-label">宿泊代</label><input type="number" class="form-control amount-input" id="accommodation" placeholder="0"></div>
+            <div class="col-6"><label class="fw-bold-label">駐車場</label><input type="number" class="form-control amount-input" id="parking" placeholder="0"></div>
           </div>
 
+          <!-- ガソリン計算 -->
           <div class="mb-3 p-2 bg-light rounded">
-            <small class="fw-bold">ガソリン (距離/燃費/単価)</small>
+            <label class="fw-bold-label">ガソリン (距離/燃費/単価)</label>
             <div class="input-group input-group-sm mt-1">
               <input type="number" class="form-control gas-calc" id="dist" placeholder="km">
               <input type="number" class="form-control gas-calc" id="eff" placeholder="km/L">
@@ -55,24 +60,39 @@
             <input type="number" class="form-control amount-input mt-2 fw-bold" id="gasTotal" readonly placeholder="合計" value="0">
           </div>
 
+          <!-- その他項目（動的生成っぽく見せて固定で生成） -->
           <div id="otherItems">
             <script>
-              for(let i=1; i<=8; i++) document.write(`<div class="input-group input-group-sm mb-2 other-row"><span class="input-group-text">他${i}</span><input type="text" class="form-control item-name"><input type="number" class="form-control amount-input" placeholder="0"></div>`);
+              for(let i=1; i<=8; i++) {
+                document.write(`
+                  <div class="input-group input-group-sm mb-2 other-row">
+                    <span class="input-group-text">他${i}</span>
+                    <input type="text" class="form-control item-name" placeholder="項目名">
+                    <input type="number" class="form-control amount-input" placeholder="0">
+                  </div>
+                `);
+              }
             </script>
           </div>
 
+          <!-- 人数選択 -->
           <div class="mb-3 mt-4">
-            <label for="splitCount" class="form-label small fw-bold">何人で割りますか？</label>
+            <label for="splitCount" class="form-label fw-bold-label">何人で割りますか？</label>
             <select class="form-select" id="splitCount">
-              <option value="1">1人</option><option value="2" selected>2人</option><option value="3">3人</option><option value="4">4人</option>
+              <option value="1">1人</option>
+              <option value="2" selected>2人</option>
+              <option value="3">3人</option>
+              <option value="4">4人</option>
             </select>
           </div>
 
+          <!-- 合計表示 -->
           <div class="alert alert-secondary py-2 mb-3">
             <div class="fw-bold">総額: ¥<span id="grandTotal">0</span></div>
             <div class="small">1人: ¥<span id="perPersonTotal">0</span></div>
           </div>
 
+          <!-- 送信ボタン -->
           <button type="button" class="btn btn-success w-100 py-3 fw-bold" id="sendBtn" onclick="onSend()">
             友だちを選んで送信
           </button>
@@ -84,21 +104,27 @@
 
 <script>
   // ==========================================
-  const LIFF_ID = "2008842942-XFy8Tty3"; 
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbxK0YaFYVlqwa0F_foz-2WlguFEyrpry1dvKJ6vmDGdPkpWlfDsaWb9vQuaiHdRMC1n/exec"; 
+  // 設定セクション
   // ==========================================
+  const CONFIG = {
+    LIFF_ID: "2008842942-XFy8Tty3",
+    // GASのデプロイURL (デプロイし直した場合はここを更新)
+    GAS_URL: "https://script.google.com/macros/s/AKfycbxK0YaFYVlqwa0F_foz-2WlguFEyrpry1dvKJ6vmDGdPkpWlfDsaWb9vQuaiHdRMC1n/exec"
+  };
 
-  let displayName = "不明";
-  let userId = "";
+  let userProfile = { displayName: "不明", userId: "" };
 
+  // ==========================================
+  // 初期化 & イベントリスナー
+  // ==========================================
   window.onload = function() {
-    liff.init({ liffId: LIFF_ID }).then(() => {
+    liff.init({ liffId: CONFIG.LIFF_ID }).then(() => {
       if (!liff.isLoggedIn()) {
         liff.login();
       } else {
         liff.getProfile().then(profile => {
-          displayName = profile.displayName;
-          userId = profile.userId;
+          userProfile.displayName = profile.displayName;
+          userProfile.userId = profile.userId;
         });
         document.getElementById('loading').classList.add('d-none');
         document.getElementById('mainView').classList.remove('d-none');
@@ -106,31 +132,50 @@
     });
   };
 
-  document.addEventListener('input', function() {
-    const d = parseFloat(document.getElementById('dist').value)||0;
-    const e = parseFloat(document.getElementById('eff').value)||0;
-    const p = parseFloat(document.getElementById('price').value)||0;
+  // 入力が変更されるたびに自動計算
+  document.addEventListener('input', calculateTotal);
+
+  function calculateTotal() {
+    // 1. ガソリン代の計算
+    const d = parseFloat(document.getElementById('dist').value) || 0;
+    const e = parseFloat(document.getElementById('eff').value) || 0;
+    const p = parseFloat(document.getElementById('price').value) || 0;
+    
+    // 燃費が0だと無限大になるのでガード
     const gas = (e > 0) ? Math.floor((d / e) * p) : 0;
     document.getElementById('gasTotal').value = gas;
 
+    // 2. 全項目の合計計算
     let sum = 0;
-    document.querySelectorAll('.amount-input').forEach(el => sum += parseInt(el.value)||0);
+    document.querySelectorAll('.amount-input').forEach(el => {
+      sum += parseInt(el.value) || 0;
+    });
+
     const split = parseInt(document.getElementById('splitCount').value);
+    
+    // 表示更新
     document.getElementById('grandTotal').innerText = sum.toLocaleString();
     document.getElementById('perPersonTotal').innerText = Math.ceil(sum / split).toLocaleString();
-  });
+  }
 
+  // ==========================================
+  // 送信処理
+  // ==========================================
   function onSend() {
     if (!liff.isLoggedIn()) return alert("再ログインしてください");
-    
+    if (!CONFIG.GAS_URL) return alert("システムエラー: GAS_URLが設定されていません");
+
     const btn = document.getElementById('sendBtn');
-    btn.disabled = true; btn.innerText = "処理中...";
+    btn.disabled = true; 
+    btn.innerText = "処理中..."; // 連打防止
     
     const destination = document.getElementById('destination').value || "未入力";
-    const totalAmount = document.getElementById('grandTotal').innerText.replace(/,/g, '');
+    const totalAmountStr = document.getElementById('grandTotal').innerText.replace(/,/g, '');
+    const totalAmount = parseInt(totalAmountStr) || 0;
     const splitCount = document.getElementById('splitCount').value;
     const perPerson = document.getElementById('perPersonTotal').innerText;
 
+    // LINEメッセージの構築
     let msg = `【簡易精算: ${destination}】\n`;
     let detailText = ""; 
     
@@ -140,6 +185,7 @@
       others: []
     };
 
+    // 基本項目の追加ヘルパー
     const addBasic = (id, name, key) => {
       const v = parseInt(document.getElementById(id).value) || 0;
       if (v > 0) {
@@ -148,12 +194,14 @@
         jsonData.basic[key] = v;
       }
     };
+
     addBasic('rentalCar', 'レンタカー', 'rental');
     addBasic('highway', '高速', 'highway');
     addBasic('accommodation', '宿泊', 'accommodation');
     addBasic('parking', '駐車場', 'parking');
     
-    const gas = parseInt(document.getElementById('gasTotal').value);
+    // ガソリン
+    const gas = parseInt(document.getElementById('gasTotal').value) || 0;
     if(gas > 0) {
       const d = document.getElementById('dist').value;
       const e = document.getElementById('eff').value;
@@ -164,6 +212,7 @@
       jsonData.gas = { amount: gas, dist: d, eff: e, price: p };
     }
     
+    // その他項目
     document.querySelectorAll('.other-row').forEach(row => {
       const name = row.querySelector('.item-name').value || 'その他';
       const val = parseInt(row.querySelector('.amount-input').value) || 0;
@@ -175,16 +224,15 @@
       }
     });
 
-    const summary = `総額: ¥${parseInt(totalAmount).toLocaleString()} (1人: ¥${perPerson})`;
+    const summary = `総額: ¥${totalAmount.toLocaleString()} (1人: ¥${perPerson})`;
     msg += `\n\n${summary}`;
+    msg += `\n\n----------------\n▼このBotを友だち追加\nhttps://lin.ee/A8jCBxs`; // 友だち追加リンク
 
-    // ★追加：友だち追加リンク
-    msg += `\n\n----------------\n▼このBotを友だち追加\nhttps://lin.ee/A8jCBxs`;
-
+    // GAS用データ
     const logData = {
       type: "簡易精算",
-      user: displayName,
-      userId: userId,
+      user: userProfile.displayName,
+      userId: userProfile.userId,
       destination: destination,
       total: totalAmount,
       count: splitCount,
@@ -193,22 +241,45 @@
       jsonDetail: JSON.stringify(jsonData)
     };
     
-    fetch(GAS_URL, {
+    // 1. GASへ送信 (Fire and Forget)
+    // ユーザー同意の通り、結果を待たずに進む
+    fetch(CONFIG.GAS_URL, {
       method: "POST",
       mode: "no-cors",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(logData)
-    });
+    }).catch(e => console.error("Log send error:", e));
 
+    // 2. LINE ShareTargetPicker 起動
     if (liff.isApiAvailable('shareTargetPicker')) {
       liff.shareTargetPicker([{ type: "text", text: msg }])
       .then((res) => {
-        if (res) { alert("送信しました！"); liff.closeWindow(); }
-        else { alert("キャンセルしました"); btn.disabled = false; btn.innerText = "友だちを選んで送信"; }
+        if (res) { 
+          alert("送信しました！"); 
+          liff.closeWindow(); 
+        } else { 
+          // キャンセル時はボタンを復活
+          alert("キャンセルしました"); 
+          btn.disabled = false; 
+          btn.innerText = "友だちを選んで送信"; 
+        }
+      }).catch(err => {
+        alert("送信に失敗しました");
+        btn.disabled = false;
+        btn.innerText = "友だちを選んで送信";
       });
     } else {
+      // 外部ブラウザ等でPickerが使えない場合のフォールバック
       liff.sendMessages([{ type: 'text', text: msg }])
-      .then(() => { alert("Botに送信しました。"); liff.closeWindow(); });
+      .then(() => { 
+        alert("Botとのトークルームに送信しました。"); 
+        liff.closeWindow(); 
+      })
+      .catch((err) => {
+        alert("送信できませんでした。");
+        btn.disabled = false;
+        btn.innerText = "友だちを選んで送信";
+      });
     }
   }
 </script>
