@@ -54,6 +54,7 @@
         <div class="mb-2">
           <label class="form-label fw-bold-label">メンバーの名前 <span class="badge bg-danger">必須</span></label>
           <div id="memberNamesArea"></div>
+          <div class="form-text small text-danger" id="nameErrorMsg"></div>
         </div>
       </div>
     </div>
@@ -167,6 +168,9 @@
   // 名前入力時の同期処理
   function onNameChange(index, newName) {
     members[index] = newName;
+    // エラーメッセージのクリア
+    document.getElementById('nameErrorMsg').innerText = "";
+    
     // 既存の立替項目のプルダウン表示名を更新
     document.querySelectorAll('.payer-select').forEach(select => {
       if(select.options[index]) {
@@ -209,7 +213,7 @@
       </div>
       <div class="input-group">
         <select class="form-select payer-select" style="max-width: 40%;">${options}</select>
-        <input type="number" class="form-control amount-input" placeholder="金額">
+        <input type="number" class="form-control amount-input" placeholder="金額" min="0">
       </div>`;
     list.appendChild(div);
   }
@@ -231,9 +235,9 @@
         <span class="delete-btn" onclick="this.parentElement.parentElement.remove()">×</span>
       </div>
       <div class="input-group input-group-sm mb-2">
-        <input type="number" class="form-control gas-dist" placeholder="距離km" oninput="calcGasRow(this)">
-        <input type="number" class="form-control gas-eff" placeholder="燃費" oninput="calcGasRow(this)">
-        <input type="number" class="form-control gas-price" placeholder="単価" oninput="calcGasRow(this)">
+        <input type="number" class="form-control gas-dist" placeholder="距離km" min="0" oninput="calcGasRow(this)">
+        <input type="number" class="form-control gas-eff" placeholder="燃費" min="0" oninput="calcGasRow(this)">
+        <input type="number" class="form-control gas-price" placeholder="単価" min="0" oninput="calcGasRow(this)">
       </div>
       <div class="input-group">
         <select class="form-select payer-select" style="max-width: 40%;">${options}</select>
@@ -249,6 +253,8 @@
     const e = parseFloat(row.querySelector('.gas-eff').value) || 0;
     const p = parseFloat(row.querySelector('.gas-price').value) || 0;
     
+    if (d < 0 || e < 0 || p < 0) return; // マイナス値の場合は計算しない
+
     let total = 0;
     if (e > 0) {
       total = Math.floor((d / e) * p);
@@ -260,11 +266,20 @@
   // 計算ロジック (Core Logic)
   // ==========================================
   function calculate() {
-    // バリデーション: メンバー名
+    // 1. バリデーション: メンバー名入力チェック
     const emptyMemberIndex = members.findIndex(m => !m || m.trim() === "");
     if (emptyMemberIndex !== -1) {
         alert(`メンバー${emptyMemberIndex + 1}の名前が入力されていません。\n全員の名前を入力してください。`);
         return; 
+    }
+
+    // 2. バリデーション: メンバー名重複チェック (★追加)
+    // Setを使って重複を除去し、サイズを比較
+    const uniqueMembers = new Set(members.map(m => m.trim()));
+    if (uniqueMembers.size !== members.length) {
+      alert("メンバー名が重複しています。\nそれぞれ別の名前を入力してください（例: 田中A, 田中B）。");
+      document.getElementById('nameErrorMsg').innerText = "※同じ名前は使用できません";
+      return;
     }
 
     // 集計用変数
@@ -273,13 +288,26 @@
     let itemsText = ""; 
     let detailText = ""; 
     let detailsArr = []; 
+    let hasNegativeError = false; // マイナス値エラーフラグ
 
     // 各行の集計
-    document.querySelectorAll('.expense-row').forEach(row => {
+    const expenseRows = document.querySelectorAll('.expense-row');
+    for (const row of expenseRows) {
       const name = row.querySelector('.item-name').value || "未入力項目";
       const payerIdx = parseInt(row.querySelector('.payer-select').value);
-      const amount = parseInt(row.querySelector('.amount-input').value) || 0;
+      const amountInput = row.querySelector('.amount-input');
+      const amount = parseInt(amountInput.value) || 0;
       
+      // マイナス値チェック (★追加)
+      if (amount < 0) {
+        alert(`項目「${name}」の金額がマイナスになっています。\n正しい金額を入力してください。`);
+        amountInput.classList.add('is-invalid'); // 赤枠などを出す場合
+        hasNegativeError = true;
+        break; // ループを抜ける
+      } else {
+        amountInput.classList.remove('is-invalid');
+      }
+
       if (amount > 0) {
         payments[payerIdx] += amount;
         totalAmount += amount;
@@ -305,7 +333,9 @@
           detailsArr.push({ item: name, payer: members[payerIdx], amount: amount });
         }
       }
-    });
+    }
+
+    if (hasNegativeError) return; // エラーがあれば中断
 
     if (totalAmount === 0) return alert("金額が入力されていません。");
 
@@ -321,7 +351,6 @@
     const remainder = totalAmount % memberCount; // 割り切れない端数
     
     // バランス計算 (プラスなら払いすぎ=受取れる、マイナスなら不足=支払う)
-    // 端数はメンバーIDが若い順に1円多く負担するルールとする
     const balances = payments.map((paid, idx) => {
       const burden = baseShare + (idx < remainder ? 1 : 0);
       return { id: idx, name: members[idx], balance: paid - burden };
@@ -339,7 +368,6 @@
       const cred = creditors[creditorIdx];
       const debt = debtors[debtorIdx];
       
-      // 取引額は「債権者の受取残高」と「債務者の支払残高」の小さい方
       const amount = Math.min(cred.balance, Math.abs(debt.balance));
       
       if (amount > 0) {
@@ -349,7 +377,6 @@
       cred.balance -= amount; 
       debt.balance += amount;
       
-      // 完済したら次へ
       if (Math.abs(cred.balance) < 1) creditorIdx++;
       if (Math.abs(debt.balance) < 1) debtorIdx++;
     }
@@ -405,10 +432,11 @@
     if (!CONFIG.GAS_URL) return alert("システムエラー: GAS_URLが設定されていません");
     
     const btn = document.getElementById('sendBtn');
+    // ★二重送信防止処理 (再確認済み)
     btn.disabled = true;
     btn.innerText = "送信中...";
 
-    // 1. GASへ送信 (Fire and Forget)
+    // 1. GASへ送信
     fetch(CONFIG.GAS_URL, {
       method: "POST",
       mode: "no-cors",
