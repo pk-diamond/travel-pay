@@ -26,6 +26,12 @@
       background: #fff; z-index: 9999; 
       display: flex; align-items: center; justify-content: center; flex-direction: column; 
     }
+    /* クレジットのスタイル */
+    .footer-credit {
+      font-size: 0.75rem;
+      opacity: 0.8; /* ピンク色を目立たせるため少し不透明度を上げました */
+      letter-spacing: 0.05em;
+    }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -58,6 +64,21 @@
         <p class="text-muted small mb-0">複雑な割り勘はこちら</p>
       </div>
     </a>
+
+    <!-- 新機能（思わせぶりボタン） -->
+    <a href="#" class="text-decoration-none" onclick="alert('現在、極秘開発中です。\n公開をお待ちください。')">
+      <div class="card menu-card bg-white border border-warning" style="border-style: dashed !important;">
+        <h5 class="fw-bold text-warning mb-2">🕶️ シークレット・モード</h5>
+        <p class="text-muted small mb-0">※開発中の実験的機能です...</p>
+      </div>
+    </a>
+
+    <!-- フッタークレジット -->
+    <div class="text-center mt-5">
+      <p class="text-muted footer-credit">
+        Designed & Developed by <span style="color: #d63384; font-weight: bold;">PK_Code</span>
+      </p>
+    </div>
 
   </div>
 </div>
