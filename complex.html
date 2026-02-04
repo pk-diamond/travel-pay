@@ -10,9 +10,12 @@
     .container { max-width: 600px; margin-top: 20px; margin-bottom: 60px; }
     .card { border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 12px; }
     #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+    
+    /* 入力行のスタイル */
     .expense-row { background-color: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #eee; }
     .gas-row { background-color: #e3f2fd; border-color: #bbdefb; }
-    .delete-btn { color: #dc3545; cursor: pointer; font-size: 1.2rem; line-height: 1; }
+    .delete-btn { color: #dc3545; cursor: pointer; font-size: 1.2rem; line-height: 1; margin-left: 10px;}
+    .fw-bold-label { font-size: 0.85rem; font-weight: bold; }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -29,17 +32,18 @@
       <a href="index.html" class="text-decoration-none text-secondary fw-bold">&lt; メニューに戻る</a>
     </div>
 
+    <!-- 設定エリア -->
     <div class="card mb-4">
       <div class="card-body">
         <h5 class="card-title text-center text-success mb-3 fw-bold">詳細精算設定</h5>
         
         <div class="mb-3">
-          <label class="form-label small fw-bold">旅行の行き先</label>
+          <label class="form-label fw-bold-label">旅行の行き先</label>
           <input type="text" class="form-control" id="destination" placeholder="例：北海道旅行">
         </div>
 
         <div class="mb-3">
-          <label class="form-label small fw-bold">旅行の人数</label>
+          <label class="form-label fw-bold-label">旅行の人数</label>
           <select class="form-select" id="memberCount" onchange="updateMemberInputs()">
             <option value="2" selected>2人</option>
             <option value="3">3人</option>
@@ -48,12 +52,13 @@
         </div>
         
         <div class="mb-2">
-          <label class="form-label small fw-bold">メンバーの名前 <span class="badge bg-danger">必須</span></label>
+          <label class="form-label fw-bold-label">メンバーの名前 <span class="badge bg-danger">必須</span></label>
           <div id="memberNamesArea"></div>
         </div>
       </div>
     </div>
 
+    <!-- 項目入力エリア -->
     <div class="card mb-4">
       <div class="card-body">
         <h5 class="card-title text-center text-success mb-3 fw-bold">立替項目の入力</h5>
@@ -74,12 +79,14 @@
       </div>
     </div>
 
+    <!-- 計算ボタン -->
     <button type="button" class="btn btn-primary w-100 py-3 fw-bold mb-4 shadow-sm" onclick="calculate()">計算する</button>
 
+    <!-- 結果表示エリア -->
     <div id="resultCard" class="card mb-4 d-none bg-light border-success">
       <div class="card-body">
         <h5 class="fw-bold text-center text-dark mb-3">💰 精算結果</h5>
-        <div id="resultContent" class="mb-3 small"></div>
+        <div id="resultContent" class="mb-3 small" style="white-space: pre-wrap;"></div>
         <button type="button" class="btn btn-success w-100 fw-bold" id="sendBtn" onclick="onSend()">結果をLINEで送信</button>
       </div>
     </div>
@@ -88,36 +95,53 @@
 
 <script>
   // ==========================================
-  const LIFF_ID = "2008842942-XFy8Tty3"; 
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbxK0YaFYVlqwa0F_foz-2WlguFEyrpry1dvKJ6vmDGdPkpWlfDsaWb9vQuaiHdRMC1n/exec"; 
+  // 設定セクション
   // ==========================================
+  const CONFIG = {
+    LIFF_ID: "2008842942-XFy8Tty3",
+    GAS_URL: "https://script.google.com/macros/s/AKfycbxK0YaFYVlqwa0F_foz-2WlguFEyrpry1dvKJ6vmDGdPkpWlfDsaWb9vQuaiHdRMC1n/exec"
+  };
 
+  // ==========================================
+  // 状態管理変数
+  // ==========================================
   let members = [];
   let calculatedMsg = "";
   let logData = {}; 
-  let displayName = "不明";
-  let userId = "";
+  let userProfile = { displayName: "不明", userId: "" };
 
+  // ==========================================
+  // 初期化処理
+  // ==========================================
   window.onload = function() {
-    liff.init({ liffId: LIFF_ID }).then(() => {
+    liff.init({ liffId: CONFIG.LIFF_ID }).then(() => {
       if (!liff.isLoggedIn()) {
         liff.login();
       } else {
         liff.getProfile().then(p => {
-          displayName = p.displayName;
-          userId = p.userId;
+          userProfile.displayName = p.displayName;
+          userProfile.userId = p.userId;
         });
         document.getElementById('loading').classList.add('d-none');
         document.getElementById('mainView').classList.remove('d-none');
+        
+        // 初期表示構築
         updateMemberInputs();
         addExpenseRow(); 
       }
     });
   };
 
+  // ==========================================
+  // UI操作ロジック
+  // ==========================================
+
+  // メンバー人数変更時の入力欄更新
   function updateMemberInputs() {
     const count = parseInt(document.getElementById('memberCount').value);
     const area = document.getElementById('memberNamesArea');
+    
+    // 現在入力されている名前を一時保存
     const currentNames = [];
     document.querySelectorAll('.member-name-input').forEach(input => currentNames.push(input.value));
 
@@ -127,16 +151,23 @@
     for(let i=0; i<count; i++) {
       const val = currentNames[i] || "";
       members.push(val);
+      
       const div = document.createElement('div');
       div.className = "input-group mb-2";
-      div.innerHTML = `<span class="input-group-text bg-white small">メンバー${i+1}</span><input type="text" class="form-control member-name-input" value="${val}" placeholder="名前を入力" oninput="onNameChange(${i}, this.value)">`;
+      div.innerHTML = `
+        <span class="input-group-text bg-white small">メンバー${i+1}</span>
+        <input type="text" class="form-control member-name-input" value="${val}" placeholder="名前を入力" oninput="onNameChange(${i}, this.value)">
+      `;
       area.appendChild(div);
     }
+    // 立替人のプルダウンも更新
     refreshAllPayerSelects();
   }
 
+  // 名前入力時の同期処理
   function onNameChange(index, newName) {
     members[index] = newName;
+    // 既存の立替項目のプルダウン表示名を更新
     document.querySelectorAll('.payer-select').forEach(select => {
       if(select.options[index]) {
         select.options[index].text = newName || `(メンバー${index+1})`;
@@ -144,6 +175,7 @@
     });
   }
 
+  // 全ての立替人プルダウンを再構築
   function refreshAllPayerSelects() {
     document.querySelectorAll('.payer-select').forEach(select => {
       const currentVal = select.value;
@@ -154,18 +186,22 @@
         opt.text = name || `(メンバー${idx+1})`;
         select.appendChild(opt);
       });
+      // 選択状態を維持（人数が減った場合は0に戻す）
       select.value = (currentVal < members.length) ? currentVal : 0;
     });
   }
 
+  // 通常経費行の追加
   function addExpenseRow() {
     const list = document.getElementById('expenseList');
     const div = document.createElement('div');
     div.className = "expense-row normal-row"; 
+    
     let options = "";
     members.forEach((name, idx) => {
         options += `<option value="${idx}">${name || `(メンバー${idx+1})`}</option>`
     });
+    
     div.innerHTML = `
       <div class="d-flex justify-content-between align-items-center mb-2">
         <input type="text" class="form-control form-control-sm me-2 item-name" placeholder="項目名">
@@ -178,14 +214,17 @@
     list.appendChild(div);
   }
 
+  // ガソリン経費行の追加
   function addGasolineRow() {
     const list = document.getElementById('expenseList');
     const div = document.createElement('div');
     div.className = "expense-row gas-row"; 
+    
     let options = "";
     members.forEach((name, idx) => {
         options += `<option value="${idx}">${name || `(メンバー${idx+1})`}</option>`
     });
+    
     div.innerHTML = `
       <div class="d-flex justify-content-between align-items-center mb-2">
         <input type="text" class="form-control form-control-sm me-2 item-name" value="ガソリン" placeholder="項目名">
@@ -203,6 +242,7 @@
     list.appendChild(div);
   }
 
+  // ガソリン行の自動計算
   function calcGasRow(input) {
     const row = input.closest('.expense-row');
     const d = parseFloat(row.querySelector('.gas-dist').value) || 0;
@@ -216,19 +256,25 @@
     row.querySelector('.amount-input').value = (total > 0) ? total : "";
   }
 
+  // ==========================================
+  // 計算ロジック (Core Logic)
+  // ==========================================
   function calculate() {
+    // バリデーション: メンバー名
     const emptyMemberIndex = members.findIndex(m => !m || m.trim() === "");
     if (emptyMemberIndex !== -1) {
         alert(`メンバー${emptyMemberIndex + 1}の名前が入力されていません。\n全員の名前を入力してください。`);
         return; 
     }
 
-    const payments = new Array(members.length).fill(0);
+    // 集計用変数
+    const payments = new Array(members.length).fill(0); // 各メンバーの支払済額
     let totalAmount = 0;
     let itemsText = ""; 
     let detailText = ""; 
     let detailsArr = []; 
 
+    // 各行の集計
     document.querySelectorAll('.expense-row').forEach(row => {
       const name = row.querySelector('.item-name').value || "未入力項目";
       const payerIdx = parseInt(row.querySelector('.payer-select').value);
@@ -238,6 +284,7 @@
         payments[payerIdx] += amount;
         totalAmount += amount;
 
+        // ガソリン行かどうかの判定と情報取得
         if (row.classList.contains('gas-row')) {
           const d = row.querySelector('.gas-dist').value;
           const e = row.querySelector('.gas-eff').value;
@@ -262,14 +309,19 @@
 
     if (totalAmount === 0) return alert("金額が入力されていません。");
 
+    // メンバーごとの支払合計表示用
     let memberTotals = "";
     members.forEach((name, idx) => {
       memberTotals += `・${name}: ¥${payments[idx].toLocaleString()}\n`;
     });
 
+    // --- 債権債務の計算アルゴリズム ---
     const memberCount = members.length;
-    const baseShare = Math.floor(totalAmount / memberCount);
-    const remainder = totalAmount % memberCount;
+    const baseShare = Math.floor(totalAmount / memberCount); // 1人あたりの負担額
+    const remainder = totalAmount % memberCount; // 割り切れない端数
+    
+    // バランス計算 (プラスなら払いすぎ=受取れる、マイナスなら不足=支払う)
+    // 端数はメンバーIDが若い順に1円多く負担するルールとする
     const balances = payments.map((paid, idx) => {
       const burden = baseShare + (idx < remainder ? 1 : 0);
       return { id: idx, name: members[idx], balance: paid - burden };
@@ -277,19 +329,32 @@
 
     const creditors = balances.filter(b => b.balance > 0).sort((a,b) => b.balance - a.balance);
     const debtors = balances.filter(b => b.balance < 0).sort((a,b) => a.balance - b.balance);
+    
     let transactions = [];
-    let creditorIdx = 0; let debtorIdx = 0;
+    let creditorIdx = 0; 
+    let debtorIdx = 0;
 
+    // 貪欲法によるマッチング
     while (creditorIdx < creditors.length && debtorIdx < debtors.length) {
       const cred = creditors[creditorIdx];
       const debt = debtors[debtorIdx];
+      
+      // 取引額は「債権者の受取残高」と「債務者の支払残高」の小さい方
       const amount = Math.min(cred.balance, Math.abs(debt.balance));
-      if (amount > 0) transactions.push({ from: debt.name, to: cred.name, amount: amount });
-      cred.balance -= amount; debt.balance += amount;
+      
+      if (amount > 0) {
+        transactions.push({ from: debt.name, to: cred.name, amount: amount });
+      }
+      
+      cred.balance -= amount; 
+      debt.balance += amount;
+      
+      // 完済したら次へ
       if (Math.abs(cred.balance) < 1) creditorIdx++;
       if (Math.abs(debt.balance) < 1) debtorIdx++;
     }
 
+    // --- メッセージ構築 ---
     const destination = document.getElementById('destination').value || "未入力";
     
     calculatedMsg = `【詳細精算: ${destination}】\n\n`;
@@ -311,18 +376,18 @@
       });
     }
     calculatedMsg += `----------------`;
-    
-    // ★追加：友だち追加リンク
     calculatedMsg += `\n\n▼このBotを友だち追加\nhttps://lin.ee/A8jCBxs`;
 
+    // 結果表示
     document.getElementById('resultContent').innerText = calculatedMsg;
     document.getElementById('resultCard').classList.remove('d-none');
     document.getElementById('resultCard').scrollIntoView({behavior: "smooth"});
 
+    // GAS用ログデータ準備
     logData = {
       type: "詳細精算",
-      user: displayName,
-      userId: userId,
+      user: userProfile.displayName,
+      userId: userProfile.userId,
       destination: destination,
       total: totalAmount,
       count: memberCount,
@@ -332,22 +397,49 @@
     };
   }
 
+  // ==========================================
+  // 送信処理
+  // ==========================================
   function onSend() {
     if (!calculatedMsg) return;
+    if (!CONFIG.GAS_URL) return alert("システムエラー: GAS_URLが設定されていません");
     
-    fetch(GAS_URL, {
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = true;
+    btn.innerText = "送信中...";
+
+    // 1. GASへ送信 (Fire and Forget)
+    fetch(CONFIG.GAS_URL, {
       method: "POST",
       mode: "no-cors",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(logData)
-    });
+    }).catch(e => console.error("Log send error:", e));
 
+    // 2. LINE ShareTargetPicker 起動
     if (liff.isApiAvailable('shareTargetPicker')) {
       liff.shareTargetPicker([{ type: "text", text: calculatedMsg }])
-      .then(res => { if (res) { alert("送信しました！"); liff.closeWindow(); } })
+      .then(res => { 
+        if (res) { 
+          alert("送信しました！"); 
+          liff.closeWindow(); 
+        } else {
+          alert("キャンセルしました"); 
+          btn.disabled = false;
+          btn.innerText = "結果をLINEで送信";
+        }
+      })
+      .catch(err => {
+        alert("送信に失敗しました");
+        btn.disabled = false;
+        btn.innerText = "結果をLINEで送信";
+      });
     } else {
       liff.sendMessages([{ type: 'text', text: calculatedMsg }])
-      .then(() => { alert("Botに送信しました。"); liff.closeWindow(); });
+      .then(() => { 
+        alert("Botとのトークルームに送信しました。"); 
+        liff.closeWindow(); 
+      });
     }
   }
 </script>
