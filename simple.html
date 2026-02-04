@@ -85,7 +85,6 @@
 <script>
   // ==========================================
   const LIFF_ID = "2008842942-XFy8Tty3"; 
-  // ★GASのURL（更新は不要ですが、念のため確認）
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxK0YaFYVlqwa0F_foz-2WlguFEyrpry1dvKJ6vmDGdPkpWlfDsaWb9vQuaiHdRMC1n/exec"; 
   // ==========================================
 
@@ -99,7 +98,7 @@
       } else {
         liff.getProfile().then(profile => {
           displayName = profile.displayName;
-          userId = profile.userId; // ★ID取得
+          userId = profile.userId;
         });
         document.getElementById('loading').classList.add('d-none');
         document.getElementById('mainView').classList.remove('d-none');
@@ -135,20 +134,18 @@
     let msg = `【簡易精算: ${destination}】\n`;
     let detailText = ""; 
     
-    // ★JSONデータ作成用オブジェクト
     let jsonData = {
       basic: {},
       gas: {},
       others: []
     };
 
-    // 基本項目の処理
     const addBasic = (id, name, key) => {
       const v = parseInt(document.getElementById(id).value) || 0;
       if (v > 0) {
         msg += `\n■${name}: ¥${v.toLocaleString()}`;
         detailText += `・${name}: ${v}円\n`;
-        jsonData.basic[key] = v; // JSONに追加
+        jsonData.basic[key] = v;
       }
     };
     addBasic('rentalCar', 'レンタカー', 'rental');
@@ -156,7 +153,6 @@
     addBasic('accommodation', '宿泊', 'accommodation');
     addBasic('parking', '駐車場', 'parking');
     
-    // ガソリン処理
     const gas = parseInt(document.getElementById('gasTotal').value);
     if(gas > 0) {
       const d = document.getElementById('dist').value;
@@ -165,11 +161,9 @@
       const info = `(${d}km / ${e}km/L / @${p}円)`;
       msg += `\n■ガソリン: ¥${gas.toLocaleString()}\n${info}`;
       detailText += `・ガソリン: ${gas}円 ${info}\n`;
-      // JSONに追加
       jsonData.gas = { amount: gas, dist: d, eff: e, price: p };
     }
     
-    // その他項目の処理
     document.querySelectorAll('.other-row').forEach(row => {
       const name = row.querySelector('.item-name').value || 'その他';
       const val = parseInt(row.querySelector('.amount-input').value) || 0;
@@ -177,7 +171,6 @@
         const line = `■${name}: ¥${val.toLocaleString()}`;
         msg += `\n${line}`;
         detailText += `・${name}: ${val}円\n`;
-        // JSONに追加
         jsonData.others.push({ item: name, amount: val });
       }
     });
@@ -185,17 +178,19 @@
     const summary = `総額: ¥${parseInt(totalAmount).toLocaleString()} (1人: ¥${perPerson})`;
     msg += `\n\n${summary}`;
 
-    // GAS送信データ
+    // ★追加：友だち追加リンク
+    msg += `\n\n----------------\n▼このBotを友だち追加\nhttps://lin.ee/A8jCBxs`;
+
     const logData = {
       type: "簡易精算",
       user: displayName,
-      userId: userId, // ★ID送信
+      userId: userId,
       destination: destination,
       total: totalAmount,
       count: splitCount,
       summary: summary,
       textDetail: detailText,
-      jsonDetail: JSON.stringify(jsonData) // ★正しいJSONデータを送信
+      jsonDetail: JSON.stringify(jsonData)
     };
     
     fetch(GAS_URL, {
