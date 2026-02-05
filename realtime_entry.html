@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>リアルタイム精算 - 入室</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f8f9fa; color: #333; font-family: sans-serif; }
+    .container { max-width: 600px; margin-top: 30px; margin-bottom: 60px; }
+    .card { border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 12px; }
+    
+    /* タブのデザイン調整 */
+    .nav-pills .nav-link { 
+      color: #6c757d; font-weight: bold; border-radius: 8px; padding: 12px;
+    }
+    .nav-pills .nav-link.active { 
+      background-color: #198754; color: #fff; 
+    }
+    
+    /* ローディングオーバーレイ */
+    #loading { 
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+      background: rgba(255,255,255,0.9); z-index: 9999; 
+      display: flex; align-items: center; justify-content: center; flex-direction: column; 
+    }
+    .fw-bold-label { font-size: 0.85rem; font-weight: bold; }
+  </style>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+
+<!-- ローディング表示 -->
+<div id="loading" class="d-none">
+  <div class="spinner-border text-success mb-2" role="status"></div>
+  <div class="small text-muted" id="loadingText">処理中...</div>
+</div>
+
+<div class="container">
+  <!-- ヘッダー -->
+  <div class="mb-4 text-center">
+    <h4 class="fw-bold text-success">リアルタイム精算 (Beta)</h4>
+    <p class="text-muted small">旅行メンバーと同期して精算します</p>
+  </div>
+
+  <!-- ナビゲーションタブ -->
+  <ul class="nav nav-pills nav-fill mb-4" id="pills-tab" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="pills-join-tab" data-bs-toggle="pill" data-bs-target="#pills-join" type="button">参加する</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="pills-create-tab" data-bs-toggle="pill" data-bs-target="#pills-create" type="button">新しく作る</button>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="pills-tabContent">
+    
+    <!-- 1. 参加画面 (JOIN) -->
+    <div class="tab-pane fade show active" id="pills-join" role="tabpanel">
+      <div class="card">
+        <div class="card-body p-4">
+          <h5 class="card-title fw-bold mb-3">旅行に参加する</h5>
+          <p class="small text-muted mb-4">共有された「ルームID」を入力してください。</p>
+          
+          <div class="mb-3">
+            <label class="form-label fw-bold-label">ルームID</label>
+            <input type="text" class="form-control form-control-lg text-uppercase" id="joinRoomId" placeholder="TRIP-XXXX" maxlength="20">
+          </div>
+          
+          <button class="btn btn-success w-100 py-3 fw-bold shadow-sm" onclick="onJoinRoom()">
+            部屋に入る
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 作成画面 (CREATE) -->
+    <div class="tab-pane fade" id="pills-create" role="tabpanel">
+      <div class="card">
+        <div class="card-body p-4">
+          <h5 class="card-title fw-bold mb-3">新しい旅行を作る</h5>
+          
+          <div class="mb-3">
+            <label class="form-label fw-bold-label">旅行の名前</label>
+            <input type="text" class="form-control" id="createTitle" placeholder="例: 北海道旅行">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold-label">メンバー数</label>
+            <select class="form-select" id="createCount" onchange="updateMemberInputs()">
+              <option value="2" selected>2人</option>
+              <option value="3">3人</option>
+              <option value="4">4人</option>
+              <option value="5">5人</option>
+              <option value="6">6人</option>
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-bold-label">メンバーの名前</label>
+            <div id="memberInputsArea"></div>
+            <div class="form-text text-danger small" id="createErrorMsg"></div>
+          </div>
+
+          <button class="btn btn-outline-success w-100 py-3 fw-bold" onclick="onCreateRoom()">
+            ルームを作成してIDを発行
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  
+  <div class="mt-4 text-center">
+    <a href="index.html" class="text-decoration-none text-secondary small">メニューに戻る</a>
+  </div>
+</div>
+
+<!-- Bootstrap JS (タブ切り替えに必要) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  // ==========================================
+  // 設定セクション
+  // ==========================================
+  const CONFIG = {
+    // デプロイしたGASのURLを確認して更新してください
+    GAS_URL: "https://script.google.com/macros/s/AKfycbxK0YaFYVlqwa0F_foz-2WlguFEyrpry1dvKJ6vmDGdPkpWlfDsaWb9vQuaiHdRMC1n/exec",
+    LIFF_ID: "2008842942-XFy8Tty3",
+    // 次の画面（ダッシュボード）のファイル名
+    NEXT_PAGE: "realtime_dashboard.html"
+  };
+
+  // ==========================================
+  // 初期化
+  // ==========================================
+  window.onload = function() {
+    // メンバー入力欄の初期化
+    updateMemberInputs();
+
+    // 既にログイン済み（LocalStorageにIDがある）なら自動遷移するロジックを
+    // ここに入れることも可能ですが、今回はテストしやすくするため手動入力のままにします。
+    const savedRoomId = localStorage.getItem('trip_room_id');
+    if (savedRoomId) {
+        document.getElementById('joinRoomId').value = savedRoomId;
+    }
+
+    // LIFF初期化 (今はログインチェックのみ)
+    liff.init({ liffId: CONFIG.LIFF_ID }).then(() => {
+      if (!liff.isLoggedIn()) {
+        liff.login();
+      }
+    });
+  };
+
+  // ==========================================
+  // UI操作ロジック
+  // ==========================================
+  function updateMemberInputs() {
+    const count = parseInt(document.getElementById('createCount').value);
+    const area = document.getElementById('memberInputsArea');
+    const currentValues = [];
+    document.querySelectorAll('.member-input').forEach(el => currentValues.push(el.value));
+
+    area.innerHTML = "";
+    for(let i=0; i<count; i++) {
+        const val = currentValues[i] || "";
+        area.innerHTML += `
+            <div class="input-group mb-2">
+                <span class="input-group-text bg-white small">メンバー${i+1}</span>
+                <input type="text" class="form-control member-input" placeholder="名前" value="${val}">
+            </div>`;
+    }
+  }
+
+  function showLoading(show, text = "処理中...") {
+    const el = document.getElementById('loading');
+    document.getElementById('loadingText').innerText = text;
+    if (show) el.classList.remove('d-none');
+    else el.classList.add('d-none');
+  }
+
+  // ==========================================
+  // API連携ロジック
+  // ==========================================
+  
+  // 1. ルーム作成 (Create)
+  async function onCreateRoom() {
+    const title = document.getElementById('createTitle').value.trim();
+    if (!title) return alert("旅行の名前を入力してください");
+
+    const members = [];
+    let hasEmpty = false;
+    document.querySelectorAll('.member-input').forEach(el => {
+        const name = el.value.trim();
+        if (!name) hasEmpty = true;
+        members.push(name);
+    });
+
+    if (hasEmpty) return alert("全員の名前を入力してください");
+
+    // 重複チェック
+    if (new Set(members).size !== members.length) {
+        return alert("メンバー名が重複しています。別の名前にしてください。");
+    }
+
+    if (!confirm(`以下の内容でルームを作成しますか？\n\n旅行名: ${title}\nメンバー: ${members.join(', ')}`)) return;
+
+    showLoading(true, "ルームを作成しています...");
+
+    try {
+        const payload = {
+            action: 'create_room',
+            title: title,
+            members: members
+        };
+
+        // GASへ送信
+        // ※今回はAPIとして結果を受け取るため、mode: 'cors' が理想ですが、
+        // GASの仕様上CORSエラーが出やすいため、no-corsではなく
+        // テキストレスポンスを期待して単純なPOSTを行います。
+        // ★重要: GAS側は ContentService.createTextOutput でJSONを返す必要があります。
+        
+        const response = await fetch(CONFIG.GAS_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain" }, // application/jsonだとCORSで弾かれることがあるためtext/plain推奨
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+
+        if (data.result === 'success') {
+            const roomId = data.data.roomId;
+            alert(`ルームが作成されました！\nID: ${roomId}`);
+            
+            // LocalStorageに保存して遷移
+            saveSession(roomId, data.data.title);
+            window.location.href = CONFIG.NEXT_PAGE;
+        } else {
+            alert("エラーが発生しました:\n" + data.message);
+        }
+
+    } catch (e) {
+        console.error(e);
+        alert("通信エラーが発生しました。\n・URLが正しいか\n・インターネット接続\nを確認してください。");
+    } finally {
+        showLoading(false);
+    }
+  }
+
+  // 2. ルーム参加 (Join)
+  async function onJoinRoom() {
+    const roomId = document.getElementById('joinRoomId').value.trim().toUpperCase();
+    if (!roomId) return alert("ルームIDを入力してください");
+
+    showLoading(true, "ルームを探しています...");
+
+    try {
+        const payload = {
+            action: 'get_data',
+            roomId: roomId
+        };
+
+        const response = await fetch(CONFIG.GAS_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+
+        if (data.result === 'success') {
+            const roomInfo = data.data.roomInfo;
+            alert(`「${roomInfo.title}」に参加します。`);
+            
+            // LocalStorageに保存して遷移
+            saveSession(roomId, roomInfo.title);
+            window.location.href = CONFIG.NEXT_PAGE;
+        } else {
+            alert("入室できませんでした。\nIDが間違っているか、ルームが削除されています。");
+        }
+
+    } catch (e) {
+        console.error(e);
+        alert("通信エラーが発生しました。");
+    } finally {
+        showLoading(false);
+    }
+  }
+
+  // セッション保存ヘルパー
+  function saveSession(roomId, title) {
+    localStorage.setItem('trip_room_id', roomId);
+    localStorage.setItem('trip_title', title);
+  }
+
+</script>
+</body>
+</html>
