@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>リアルタイム精算 - ダッシュボード</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f8f9fa; color: #333; font-family: sans-serif; padding-bottom: 100px; }
+    .container { max-width: 600px; margin-top: 20px; }
+    
+    /* タイムラインアイテム */
+    .timeline-item {
+      background: #fff;
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+      position: relative;
+      border-left: 5px solid #198754; /* デフォルト緑 */
+    }
+    .timeline-item.type-gas { border-left-color: #0d6efd; } /* ガソリンは青 */
+    
+    .item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
+    .item-payer { font-size: 0.8rem; background: #e9ecef; padding: 2px 8px; border-radius: 10px; color: #555; }
+    .item-date { font-size: 0.7rem; color: #aaa; }
+    .item-title { font-weight: bold; font-size: 1.1rem; }
+    .item-amount { font-weight: bold; font-size: 1.2rem; color: #333; }
+    
+    .delete-btn {
+      position: absolute; bottom: 10px; right: 10px;
+      font-size: 0.8rem; color: #dc3545; cursor: pointer; opacity: 0.6;
+    }
+    
+    /* フッターアクションバー */
+    .action-bar {
+      position: fixed; bottom: 0; left: 0; width: 100%;
+      background: #fff; border-top: 1px solid #eee;
+      padding: 15px; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+      display: flex; gap: 10px; z-index: 1000;
+    }
+    
+    /* ローディング */
+    #loading { 
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+      background: rgba(255,255,255,0.9); z-index: 9999; 
+      display: flex; align-items: center; justify-content: center; flex-direction: column; 
+    }
+  </style>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+
+<!-- ローディング -->
+<div id="loading">
+  <div class="spinner-border text-success mb-2" role="status"></div>
+  <div class="small text-muted" id="loadingText">データ読み込み中...</div>
+</div>
+
+<div class="container">
+  <!-- ヘッダーエリア -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h6 class="text-muted small mb-0">現在進行中の旅行</h6>
+      <h4 class="fw-bold text-success" id="tripTitle">読み込み中...</h4>
+    </div>
+    <button class="btn btn-sm btn-outline-secondary" onclick="fetchRoomData()">
+      🔄 更新
+    </button>
+  </div>
+
+  <!-- 総額表示カード -->
+  <div class="card border-0 bg-success text-white shadow-sm mb-4">
+    <div class="card-body text-center py-3">
+      <small class="opacity-75">現在の立替総額</small>
+      <h2 class="fw-bold mb-0">¥<span id="totalAmount">0</span></h2>
+    </div>
+  </div>
+
+  <!-- タイムラインエリア -->
+  <h6 class="fw-bold text-muted small mb-2 ps-1">立替履歴</h6>
+  <div id="timelineArea">
+    <!-- ここにデータが挿入されます -->
+  </div>
+
+  <!-- 空の状態 -->
+  <div id="emptyState" class="text-center py-5 d-none">
+    <div class="text-muted mb-2" style="font-size: 2rem;">📝</div>
+    <p class="text-muted small">まだ履歴がありません。<br>下のボタンから追加してください。</p>
+  </div>
+</div>
+
+<!-- フッターアクションバー -->
+<div class="action-bar">
+  <button class="btn btn-primary flex-grow-1 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addModal">
+    ＋ 立替を追加
+  </button>
+  <button class="btn btn-outline-danger fw-bold" onclick="onSettle()">
+    💰 精算して終了
+  </button>
+</div>
+
+<!-- 追加モーダル -->
+<div class="modal fade" id="addModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title fw-bold">立替を入力</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="addForm">
+          <div class="mb-3">
+            <label class="form-label small fw-bold">誰が払いましたか？</label>
+            <select class="form-select" id="inputPayer">
+              <!-- JSで動的に追加 -->
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold">何に使いましたか？</label>
+            <input type="text" class="form-control" id="inputItem" placeholder="例: ランチ代、お土産">
+          </div>
+          <div class="mb-4">
+            <label class="form-label small fw-bold">いくらですか？</label>
+            <div class="input-group">
+              <span class="input-group-text">¥</span>
+              <input type="number" class="form-control" id="inputAmount" placeholder="0" min="0">
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary w-100 fw-bold py-3" onclick="onAddItem()">
+            追加する
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  // ==========================================
+  // 設定セクション
+  // ==========================================
+  const CONFIG = {
+    // デプロイしたGASのURL
+    GAS_URL: "https://script.google.com/macros/s/AKfycbxK0YaFYVlqwa0F_foz-2WlguFEyrpry1dvKJ6vmDGdPkpWlfDsaWb9vQuaiHdRMC1n/exec",
+    LIFF_ID: "2008842942-XFy8Tty3"
+  };
+
+  // ==========================================
+  // 状態変数
+  // ==========================================
+  let currentRoomId = "";
+  let currentMembers = [];
+  let roomInfo = {};
+
+  // ==========================================
+  // 初期化処理
+  // ==========================================
+  window.onload = function() {
+    // セッションチェック
+    currentRoomId = localStorage.getItem('trip_room_id');
+    const savedTitle = localStorage.getItem('trip_title');
+    
+    if (!currentRoomId) {
+      alert("ルーム情報が見つかりません。最初からやり直してください。");
+      window.location.href = "realtime_entry.html";
+      return;
+    }
+
+    if (savedTitle) document.getElementById('tripTitle').innerText = savedTitle;
+
+    // データ読み込み開始
+    fetchRoomData();
+
+    // LIFF初期化
+    liff.init({ liffId: CONFIG.LIFF_ID }).then(() => {
+      if (!liff.isLoggedIn()) liff.login();
+    });
+  };
+
+  function showLoading(show, text = "処理中...") {
+    const el = document.getElementById('loading');
+    document.getElementById('loadingText').innerText = text;
+    if (show) el.classList.remove('d-none');
+    else el.classList.add('d-none');
+  }
+
+  // ==========================================
+  // API連携ロジック
+  // ==========================================
+
+  // 1. データ取得 (Get Data)
+  async function fetchRoomData() {
+    showLoading(true, "データを更新中...");
+    
+    try {
+      const response = await fetch(CONFIG.GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          action: 'get_data',
+          roomId: currentRoomId
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.result === 'success') {
+        renderDashboard(data.data);
+      } else {
+        console.error(data);
+        alert("データの取得に失敗しました。\n" + data.message);
+      }
+
+    } catch (e) {
+      console.error(e);
+      alert("通信エラーが発生しました。");
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 2. アイテム追加 (Add Item)
+  async function onAddItem() {
+    const payer = document.getElementById('inputPayer').value;
+    const item = document.getElementById('inputItem').value.trim();
+    const amount = parseInt(document.getElementById('inputAmount').value) || 0;
+
+    if (!item) return alert("項目名を入力してください");
+    if (amount <= 0) return alert("正しい金額を入力してください");
+
+    // モーダルを閉じる
+    const modalEl = document.getElementById('addModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    modal.hide();
+
+    // 楽観的UI更新は複雑になるため、今回は「Loading -> 更新」の確実なフローとする
+    showLoading(true, "保存しています...");
+
+    try {
+      const response = await fetch(CONFIG.GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          action: 'add_item',
+          roomId: currentRoomId,
+          payer: payer,
+          item: item,
+          amount: amount,
+          type: 'normal'
+        })
+      });
+
+      const data = await response.json();
+      if (data.result === 'success') {
+        // 入力フォームクリア
+        document.getElementById('inputItem').value = "";
+        document.getElementById('inputAmount').value = "";
+        // 再読み込みして反映
+        await fetchRoomData();
+      } else {
+        alert("保存に失敗しました:\n" + data.message);
+      }
+    } catch (e) {
+      alert("通信エラーが発生しました。");
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 3. アイテム削除 (Delete Item)
+  async function onDeleteItem(uuid, itemName) {
+    if (!confirm(`「${itemName}」を削除しますか？`)) return;
+
+    showLoading(true, "削除中...");
+    
+    try {
+      const response = await fetch(CONFIG.GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          action: 'delete_item',
+          roomId: currentRoomId,
+          targetUuid: uuid
+        })
+      });
+
+      const data = await response.json();
+      if (data.result === 'success') {
+        await fetchRoomData();
+      } else {
+        alert("削除に失敗しました:\n" + data.message);
+      }
+    } catch (e) {
+      alert("通信エラー");
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 4. 精算して終了 (Settle)
+  async function onSettle() {
+    if (!confirm("旅行を終了して精算しますか？\n\nこれまでのデータが集計され、ログとして保存されます。\n（この操作は取り消せません）")) return;
+
+    showLoading(true, "精算処理中...\nこれには数秒かかります");
+
+    try {
+      const response = await fetch(CONFIG.GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          action: 'settle',
+          roomId: currentRoomId
+        })
+      });
+
+      const data = await response.json();
+      if (data.result === 'success') {
+        alert(`精算が完了しました！\n総額: ¥${data.data.total.toLocaleString()}\n\nメニュー画面に戻ります。`);
+        
+        // セッションクリア
+        localStorage.removeItem('trip_room_id');
+        localStorage.removeItem('trip_title');
+        
+        window.location.href = "index.html";
+      } else {
+        alert("精算処理に失敗しました:\n" + data.message);
+      }
+    } catch (e) {
+      alert("通信エラーが発生しました。");
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // ==========================================
+  // UI描画ロジック
+  // ==========================================
+  function renderDashboard(data) {
+    roomInfo = data.roomInfo;
+    const items = data.items;
+    currentMembers = roomInfo.members;
+
+    // ヘッダー情報更新
+    document.getElementById('tripTitle').innerText = roomInfo.title;
+    
+    // プルダウン更新（初回のみ、またはメンバー変更対応）
+    const select = document.getElementById('inputPayer');
+    if (select.options.length === 0) {
+      currentMembers.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.text = m;
+        select.appendChild(opt);
+      });
+    }
+
+    // タイムライン描画
+    const timelineArea = document.getElementById('timelineArea');
+    timelineArea.innerHTML = "";
+    
+    let total = 0;
+
+    if (items.length === 0) {
+      document.getElementById('emptyState').classList.remove('d-none');
+    } else {
+      document.getElementById('emptyState').classList.add('d-none');
+      
+      items.forEach(item => {
+        total += parseInt(item.amount);
+        
+        const div = document.createElement('div');
+        div.className = `timeline-item type-${item.type}`;
+        
+        // 日付フォーマット (簡易的)
+        const dateStr = new Date(item.date).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+        div.innerHTML = `
+          <div class="item-header">
+            <span class="item-payer">${item.payer}</span>
+            <span class="item-date">${dateStr}</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="item-title">${item.item}</span>
+            <span class="item-amount">¥${parseInt(item.amount).toLocaleString()}</span>
+          </div>
+          <div class="delete-btn" onclick="onDeleteItem('${item.uuid}', '${item.item}')">削除</div>
+        `;
+        timelineArea.appendChild(div);
+      });
+    }
+
+    // 総額更新
+    document.getElementById('totalAmount').innerText = total.toLocaleString();
+  }
+</script>
+</body>
+</html>
