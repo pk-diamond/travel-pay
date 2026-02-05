@@ -16,21 +16,35 @@
       padding: 15px;
       margin-bottom: 12px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-      position: relative;
       border-left: 5px solid #198754; /* デフォルト緑 */
     }
     .timeline-item.type-gas { border-left-color: #0d6efd; } /* ガソリンは青 */
     
-    .item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
-    .item-payer { font-size: 0.8rem; background: #e9ecef; padding: 2px 8px; border-radius: 10px; color: #555; }
-    .item-date { font-size: 0.7rem; color: #aaa; }
-    .item-title { font-weight: bold; font-size: 1.1rem; }
-    .item-amount { font-weight: bold; font-size: 1.2rem; color: #333; }
+    .item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .item-payer { font-size: 0.8rem; background: #e9ecef; padding: 2px 8px; border-radius: 10px; color: #555; font-weight: bold;}
+    .item-date { font-size: 0.75rem; color: #aaa; }
     
-    .delete-btn {
-      position: absolute; bottom: 10px; right: 10px;
-      font-size: 0.8rem; color: #dc3545; cursor: pointer; opacity: 0.6;
+    .item-body { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; }
+    .item-title { font-weight: bold; font-size: 1.1rem; color: #333; }
+    .item-amount { font-weight: bold; font-size: 1.3rem; color: #333; }
+    
+    /* 削除ボタンエリア（修正版） */
+    .item-footer {
+      text-align: right;
+      border-top: 1px dashed #eee;
+      padding-top: 8px;
     }
+    .delete-btn {
+      display: inline-block;
+      font-size: 0.8rem; 
+      color: #dc3545; 
+      cursor: pointer;
+      padding: 4px 10px;
+      background-color: #fff5f5;
+      border-radius: 20px;
+      transition: background-color 0.2s;
+    }
+    .delete-btn:active { background-color: #ffe0e0; }
     
     /* フッターアクションバー */
     .action-bar {
@@ -237,7 +251,6 @@
     const modal = bootstrap.Modal.getInstance(modalEl);
     modal.hide();
 
-    // 楽観的UI更新は複雑になるため、今回は「Loading -> 更新」の確実なフローとする
     showLoading(true, "保存しています...");
 
     try {
@@ -375,7 +388,7 @@
         const div = document.createElement('div');
         div.className = `timeline-item type-${item.type}`;
         
-        // 日付フォーマット (簡易的)
+        // 日付フォーマット
         const dateStr = new Date(item.date).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
         div.innerHTML = `
@@ -383,11 +396,13 @@
             <span class="item-payer">${item.payer}</span>
             <span class="item-date">${dateStr}</span>
           </div>
-          <div class="d-flex justify-content-between align-items-center">
+          <div class="item-body">
             <span class="item-title">${item.item}</span>
             <span class="item-amount">¥${parseInt(item.amount).toLocaleString()}</span>
           </div>
-          <div class="delete-btn" onclick="onDeleteItem('${item.uuid}', '${item.item}')">削除</div>
+          <div class="item-footer">
+            <span class="delete-btn" onclick="onDeleteItem('${item.uuid}', '${item.item}')">🗑 削除</span>
+          </div>
         `;
         timelineArea.appendChild(div);
       });
