@@ -7,50 +7,58 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     body { background-color: #f8f9fa; color: #333; font-family: sans-serif; padding-bottom: 100px; }
-    .container { max-width: 600px; margin-top: 20px; }
+    .container { max-width: 600px; margin-top: 15px; } /* 上部マージン削減 */
     
-    /* タイムラインアイテム */
+    /* タイムラインアイテム (コンパクト化) */
     .timeline-item {
       background: #fff;
-      border-radius: 12px;
-      padding: 15px;
-      margin-bottom: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-      border-left: 5px solid #198754; /* デフォルト緑 */
+      border-radius: 10px; /* 角丸を少し小さく */
+      padding: 10px 12px; /* パディングを縮小 (15px -> 10px/12px) */
+      margin-bottom: 8px; /* 下マージンを縮小 (12px -> 8px) */
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      border-left: 4px solid #198754; /* 線の太さを少し細く */
     }
-    .timeline-item.type-gas { border-left-color: #0d6efd; } /* ガソリンは青 */
+    .timeline-item.type-gas { border-left-color: #0d6efd; }
     
-    .item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
-    .item-payer { font-size: 0.8rem; background: #e9ecef; padding: 2px 8px; border-radius: 10px; color: #555; font-weight: bold;}
-    .item-date { font-size: 0.75rem; color: #aaa; }
+    .item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+    .item-payer { font-size: 0.75rem; background: #e9ecef; padding: 1px 8px; border-radius: 8px; color: #555; font-weight: bold;}
+    .item-date { font-size: 0.75rem; color: #999; }
     
-    .item-body { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; }
-    .item-title { font-weight: bold; font-size: 1.1rem; color: #333; }
-    .item-amount { font-weight: bold; font-size: 1.3rem; color: #333; }
+    .item-body { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; }
+    .item-title { font-weight: bold; font-size: 1rem; color: #333; }
+    .item-amount { font-weight: bold; font-size: 1.1rem; color: #333; }
     
     /* 削除ボタンエリア */
     .item-footer {
       text-align: right;
       border-top: 1px dashed #eee;
-      padding-top: 8px;
+      padding-top: 4px; /* 余白縮小 */
     }
     .delete-btn {
       display: inline-block;
-      font-size: 0.8rem; 
+      font-size: 0.75rem; 
       color: #dc3545; 
       cursor: pointer;
-      padding: 4px 10px;
+      padding: 2px 8px; /* ボタンサイズ縮小 */
       background-color: #fff5f5;
-      border-radius: 20px;
+      border-radius: 12px;
       transition: background-color 0.2s;
     }
     .delete-btn:active { background-color: #ffe0e0; }
     
+    /* 総額カード (コンパクト化) */
+    .total-card {
+        margin-bottom: 1rem !important; /* mb-4 -> mb-3相当に強制 */
+    }
+    .total-card .card-body {
+        padding: 1rem !important; /* py-3 -> 1rem */
+    }
+
     /* フッターアクションバー */
     .action-bar {
       position: fixed; bottom: 0; left: 0; width: 100%;
       background: #fff; border-top: 1px solid #eee;
-      padding: 15px; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+      padding: 12px; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
       display: flex; gap: 10px; z-index: 1000;
     }
     
@@ -66,8 +74,8 @@
       background-color: #f8f9fa;
       border: 1px solid #dee2e6;
       font-family: monospace;
-      font-size: 0.9rem;
-      white-space: pre-wrap; /* 改行を反映 */
+      font-size: 0.85rem;
+      white-space: pre-wrap;
     }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -82,7 +90,7 @@
 
 <div class="container">
   <!-- ヘッダーエリア -->
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-2">
     <div>
       <h6 class="text-muted small mb-0">現在進行中の旅行</h6>
       <h4 class="fw-bold text-success" id="tripTitle">読み込み中...</h4>
@@ -93,9 +101,9 @@
   </div>
 
   <!-- 総額表示カード -->
-  <div class="card border-0 bg-success text-white shadow-sm mb-4">
-    <div class="card-body text-center py-3">
-      <small class="opacity-75">現在の立替総額</small>
+  <div class="card border-0 bg-success text-white shadow-sm total-card">
+    <div class="card-body text-center">
+      <small class="opacity-75" style="font-size: 0.8rem;">現在の立替総額</small>
       <h2 class="fw-bold mb-0">¥<span id="totalAmount">0</span></h2>
     </div>
   </div>
@@ -127,21 +135,21 @@
 <div class="modal fade" id="addModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title fw-bold">立替を入力</h5>
+      <div class="modal-header bg-light py-2">
+        <h5 class="modal-title fw-bold fs-6">立替を入力</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <form id="addForm">
-          <div class="mb-3">
-            <label class="form-label small fw-bold">誰が払いましたか？</label>
+          <div class="mb-2">
+            <label class="form-label small fw-bold mb-1">誰が払いましたか？</label>
             <select class="form-select" id="inputPayer">
               <!-- JSで動的に追加 -->
             </select>
           </div>
           
-          <div class="mb-3">
-            <label class="form-label small fw-bold">何に使いましたか？</label>
+          <div class="mb-2">
+            <label class="form-label small fw-bold mb-1">何に使いましたか？</label>
             <input type="text" class="form-control" id="inputItem" placeholder="例: ランチ代、お土産">
           </div>
 
@@ -172,7 +180,7 @@
           </div>
 
           <div class="mb-4">
-            <label class="form-label small fw-bold">いくらですか？</label>
+            <label class="form-label small fw-bold mb-1">いくらですか？</label>
             <div class="input-group">
               <span class="input-group-text">¥</span>
               <input type="number" class="form-control" id="inputAmount" placeholder="0" min="0">
@@ -191,12 +199,12 @@
 <div class="modal fade" id="settleModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow">
-      <div class="modal-header bg-success text-white">
-        <h5 class="modal-title fw-bold">精算プレビュー</h5>
+      <div class="modal-header bg-success text-white py-2">
+        <h5 class="modal-title fw-bold fs-6">精算プレビュー</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <p class="small text-muted">以下の内容で精算し、LINEに送信しますか？<br>（送信後、旅行データはログに移動されます）</p>
+        <p class="small text-muted mb-2">以下の内容で精算し、LINEに送信しますか？<br>（送信後、旅行データはログに移動されます）</p>
         <textarea class="form-control mb-3" id="settlePreviewText" rows="10" readonly></textarea>
         <button type="button" class="btn btn-success w-100 fw-bold py-3" onclick="onFinalSettle()">
           LINEに送って完了する
@@ -214,7 +222,6 @@
   // 設定セクション
   // ==========================================
   const CONFIG = {
-    // デプロイしたGASのURL
     GAS_URL: "https://script.google.com/macros/s/AKfycbxK0YaFYVlqwa0F_foz-2WlguFEyrpry1dvKJ6vmDGdPkpWlfDsaWb9vQuaiHdRMC1n/exec",
     LIFF_ID: "2008842942-XFy8Tty3"
   };
@@ -224,15 +231,19 @@
   // ==========================================
   let currentRoomId = "";
   let currentMembers = [];
-  let currentItems = []; // 精算計算用に保持
+  let currentItems = []; 
   let roomInfo = {};
-  let calculatedMsg = ""; // LINE送信用のメッセージ
+  
+  // 送信用メッセージ（プレビュー用と送信用で分けるためオブジェクト管理）
+  let settleMessageData = {
+      body: "",
+      footer: ""
+  };
 
   // ==========================================
   // 初期化処理
   // ==========================================
   window.onload = function() {
-    // セッションチェック
     currentRoomId = localStorage.getItem('trip_room_id');
     const savedTitle = localStorage.getItem('trip_title');
     
@@ -244,10 +255,8 @@
 
     if (savedTitle) document.getElementById('tripTitle').innerText = savedTitle;
 
-    // データ読み込み開始
     fetchRoomData();
 
-    // LIFF初期化
     liff.init({ liffId: CONFIG.LIFF_ID }).then(() => {
       if (!liff.isLoggedIn()) liff.login();
     });
@@ -264,29 +273,22 @@
   // API連携ロジック
   // ==========================================
 
-  // 1. データ取得 (Get Data)
+  // 1. データ取得
   async function fetchRoomData() {
     showLoading(true, "データを更新中...");
-    
     try {
       const response = await fetch(CONFIG.GAS_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({
-          action: 'get_data',
-          roomId: currentRoomId
-        })
+        body: JSON.stringify({ action: 'get_data', roomId: currentRoomId })
       });
-
       const data = await response.json();
-
       if (data.result === 'success') {
         renderDashboard(data.data);
       } else {
         console.error(data);
         alert("データの取得に失敗しました。\n" + data.message);
       }
-
     } catch (e) {
       console.error(e);
       alert("通信エラーが発生しました。");
@@ -295,17 +297,14 @@
     }
   }
 
-  // ガソリン計算ロジック (UI)
+  // ガソリン計算UI
   function toggleGasInputs() {
     const isChecked = document.getElementById('toggleGasCalc').checked;
     const div = document.getElementById('gasInputs');
     if (isChecked) {
       div.classList.remove('d-none');
-      // 自動入力の補助
       const itemInput = document.getElementById('inputItem');
-      if (!itemInput.value) {
-        itemInput.value = "ガソリン代";
-      }
+      if (!itemInput.value) itemInput.value = "ガソリン代";
     } else {
       div.classList.add('d-none');
     }
@@ -315,21 +314,10 @@
     const d = parseFloat(document.getElementById('gasDist').value) || 0;
     const e = parseFloat(document.getElementById('gasEff').value) || 0;
     const p = parseFloat(document.getElementById('gasPrice').value) || 0;
-    
-    // 燃費eが0のときは計算しない(無限大回避)
     let total = 0;
-    if (e > 0) {
-      total = Math.floor((d / e) * p);
-    }
-
-    // 金額欄に反映
+    if (e > 0) total = Math.floor((d / e) * p);
     document.getElementById('inputAmount').value = total;
-    
-    // 計算結果表示の更新
     document.getElementById('gasCalcResult').innerText = `${d}km ÷ ${e}km/L × ${p}円 = ${total} 円`;
-
-    // 項目名に詳細を追記するロジック（オプション）
-    // 既にユーザーが独自のことを書いていなければ、詳細情報を付記する
     const itemInput = document.getElementById('inputItem');
     const baseText = "ガソリン代";
     if (itemInput.value.startsWith(baseText)) {
@@ -337,7 +325,7 @@
     }
   }
 
-  // 2. アイテム追加 (Add Item)
+  // 2. アイテム追加
   async function onAddItem() {
     const payer = document.getElementById('inputPayer').value;
     const item = document.getElementById('inputItem').value.trim();
@@ -351,8 +339,6 @@
     modal.hide();
 
     showLoading(true, "保存しています...");
-    
-    // ガソリンフラグの判定
     const isGas = document.getElementById('toggleGasCalc').checked;
     const type = isGas ? 'gas' : 'normal';
 
@@ -372,16 +358,13 @@
 
       const data = await response.json();
       if (data.result === 'success') {
-        // 入力フォームクリア
         document.getElementById('inputItem').value = "";
         document.getElementById('inputAmount').value = "";
-        // ガソリン欄リセット
         document.getElementById('toggleGasCalc').checked = false;
         document.getElementById('gasInputs').classList.add('d-none');
         document.getElementById('gasDist').value = "";
         document.getElementById('gasEff').value = "";
         document.getElementById('gasPrice').value = "";
-
         await fetchRoomData();
       } else {
         alert("保存に失敗しました:\n" + data.message);
@@ -393,23 +376,16 @@
     }
   }
 
-  // 3. アイテム削除 (Delete Item)
+  // 3. アイテム削除
   async function onDeleteItem(uuid, itemName) {
     if (!confirm(`「${itemName}」を削除しますか？`)) return;
-
     showLoading(true, "削除中...");
-    
     try {
       const response = await fetch(CONFIG.GAS_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({
-          action: 'delete_item',
-          roomId: currentRoomId,
-          targetUuid: uuid
-        })
+        body: JSON.stringify({ action: 'delete_item', roomId: currentRoomId, targetUuid: uuid })
       });
-
       const data = await response.json();
       if (data.result === 'success') {
         await fetchRoomData();
@@ -423,21 +399,21 @@
     }
   }
 
-  // 4. 精算プレビュー (Pre-Settle)
+  // 4. 精算プレビュー
   function onPreSettle() {
     if (currentItems.length === 0) return alert("精算するデータがありません。");
 
     // 精算ロジックの実行
     const result = calculateSettlement(currentMembers, currentItems);
-    calculatedMsg = result.message;
+    settleMessageData = result; // 結果を保存
 
-    // モーダル表示
-    document.getElementById('settlePreviewText').value = calculatedMsg;
+    // プレビューには本文のみ表示（リンクなし）
+    document.getElementById('settlePreviewText').value = settleMessageData.body;
     const modal = new bootstrap.Modal(document.getElementById('settleModal'));
     modal.show();
   }
 
-  // 5. 最終精算＆送信 (Final Settle)
+  // 5. 最終精算＆送信
   async function onFinalSettle() {
     const modalEl = document.getElementById('settleModal');
     const modal = bootstrap.Modal.getInstance(modalEl);
@@ -446,14 +422,16 @@
     showLoading(true, "LINE送信＆サーバー保存中...");
 
     try {
+      // 本文 + フッター（リンク等）を結合
+      const finalMsg = settleMessageData.body + settleMessageData.footer;
+
       // (1) LINE送信
       let lineSent = false;
       if (liff.isApiAvailable('shareTargetPicker')) {
-        const res = await liff.shareTargetPicker([{ type: "text", text: calculatedMsg }]);
+        const res = await liff.shareTargetPicker([{ type: "text", text: finalMsg }]);
         if (res) lineSent = true;
       } else {
-        // Fallback: トークルーム内送信
-        await liff.sendMessages([{ type: 'text', text: calculatedMsg }]);
+        await liff.sendMessages([{ type: 'text', text: finalMsg }]);
         lineSent = true;
       }
 
@@ -468,10 +446,7 @@
       const response = await fetch(CONFIG.GAS_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({
-          action: 'settle',
-          roomId: currentRoomId
-        })
+        body: JSON.stringify({ action: 'settle', roomId: currentRoomId })
       });
 
       const data = await response.json();
@@ -493,7 +468,7 @@
   }
 
   // ==========================================
-  // 計算ロジック (Algorithm)
+  // 計算ロジック
   // ==========================================
   function calculateSettlement(members, items) {
     // 1. 集計
@@ -517,10 +492,8 @@
     const baseShare = Math.floor(totalAmount / memberCount);
     const remainder = totalAmount % memberCount;
 
-    // paymentsオブジェクトを配列に変換して計算
     const balances = members.map((name, idx) => {
       const paid = payments[name];
-      // 端数はメンバー登録順(idx)で調整（0,1,2...の人に1円ずつ加算）
       const burden = baseShare + (idx < remainder ? 1 : 0);
       return { name: name, balance: paid - burden, paid: paid };
     });
@@ -536,19 +509,14 @@
       const cred = creditors[creditorIdx];
       const debt = debtors[debtorIdx];
       const amount = Math.min(cred.balance, Math.abs(debt.balance));
-      
-      if (amount > 0) {
-        transactions.push({ from: debt.name, to: cred.name, amount: amount });
-      }
-      
+      if (amount > 0) transactions.push({ from: debt.name, to: cred.name, amount: amount });
       cred.balance -= amount;
       debt.balance += amount;
-      
       if (Math.abs(cred.balance) < 1) creditorIdx++;
       if (Math.abs(debt.balance) < 1) debtorIdx++;
     }
 
-    // 3. メッセージ構築
+    // 3. メッセージ構築 (BodyとFooterを分離)
     let msg = `【旅行精算: ${roomInfo.title}】\n\n`;
     msg += `■総額: ¥${totalAmount.toLocaleString()}\n`;
     msg += `■1人あたり: 約¥${baseShare.toLocaleString()}\n\n`;
@@ -567,9 +535,11 @@
       });
     }
     msg += `----------------\n\n[内訳]\n${detailsText}`;
-    msg += `\n▼このBotを友だち追加\nhttps://lin.ee/A8jCBxs`;
+    
+    // フッター（リンクなど）
+    const footer = `\n▼このBotを友だち追加\nhttps://lin.ee/A8jCBxs`;
 
-    return { message: msg, total: totalAmount };
+    return { body: msg, footer: footer, total: totalAmount };
   }
 
   // ==========================================
@@ -578,13 +548,11 @@
   function renderDashboard(data) {
     roomInfo = data.roomInfo;
     const items = data.items;
-    currentItems = items; // 計算用に保存
+    currentItems = items;
     currentMembers = roomInfo.members;
 
-    // ヘッダー情報更新
     document.getElementById('tripTitle').innerText = roomInfo.title;
     
-    // プルダウン更新
     const select = document.getElementById('inputPayer');
     if (select.options.length === 0) {
       currentMembers.forEach(m => {
@@ -595,7 +563,6 @@
       });
     }
 
-    // タイムライン描画
     const timelineArea = document.getElementById('timelineArea');
     timelineArea.innerHTML = "";
     
@@ -612,8 +579,16 @@
         const div = document.createElement('div');
         div.className = `timeline-item type-${item.type}`;
         
-        // 日付フォーマット
-        const dateStr = new Date(item.date).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        // ★日付表示の修正 (タイムゾーン対応)
+        // GASからの形式が "yyyy/MM/dd HH:mm:ss" であることを前提に文字列処理を行う
+        let dateStr = "";
+        if (typeof item.date === 'string' && item.date.match(/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/)) {
+            // "2023/10/01 12:00:00" -> "10/01 12:00"
+            dateStr = item.date.substring(5, 16); 
+        } else {
+            // フォールバック: 従来通りDateパース
+            dateStr = new Date(item.date).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
 
         div.innerHTML = `
           <div class="item-header">
@@ -632,7 +607,6 @@
       });
     }
 
-    // 総額更新
     document.getElementById('totalAmount').innerText = total.toLocaleString();
   }
 </script>
