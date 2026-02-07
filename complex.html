@@ -87,6 +87,7 @@
     <div id="resultCard" class="card mb-4 d-none bg-light border-success">
       <div class="card-body">
         <h5 class="fw-bold text-center text-dark mb-3">💰 精算結果</h5>
+        <!-- プレビュー表示用 (リンクなし) -->
         <div id="resultContent" class="mb-3 small" style="white-space: pre-wrap;"></div>
         <button type="button" class="btn btn-success w-100 fw-bold" id="sendBtn" onclick="onSend()">結果をLINEで送信</button>
       </div>
@@ -107,7 +108,7 @@
   // 状態管理変数
   // ==========================================
   let members = [];
-  let calculatedMsg = "";
+  let calculatedMsg = ""; // 本文のみ
   let logData = {}; 
   let userProfile = { displayName: "不明", userId: "" };
 
@@ -168,10 +169,8 @@
   // 名前入力時の同期処理
   function onNameChange(index, newName) {
     members[index] = newName;
-    // エラーメッセージのクリア
     document.getElementById('nameErrorMsg').innerText = "";
     
-    // 既存の立替項目のプルダウン表示名を更新
     document.querySelectorAll('.payer-select').forEach(select => {
       if(select.options[index]) {
         select.options[index].text = newName || `(メンバー${index+1})`;
@@ -190,7 +189,6 @@
         opt.text = name || `(メンバー${idx+1})`;
         select.appendChild(opt);
       });
-      // 選択状態を維持（人数が減った場合は0に戻す）
       select.value = (currentVal < members.length) ? currentVal : 0;
     });
   }
@@ -253,7 +251,7 @@
     const e = parseFloat(row.querySelector('.gas-eff').value) || 0;
     const p = parseFloat(row.querySelector('.gas-price').value) || 0;
     
-    if (d < 0 || e < 0 || p < 0) return; // マイナス値の場合は計算しない
+    if (d < 0 || e < 0 || p < 0) return; 
 
     let total = 0;
     if (e > 0) {
@@ -273,8 +271,7 @@
         return; 
     }
 
-    // 2. バリデーション: メンバー名重複チェック (★追加)
-    // Setを使って重複を除去し、サイズを比較
+    // 2. バリデーション: メンバー名重複チェック
     const uniqueMembers = new Set(members.map(m => m.trim()));
     if (uniqueMembers.size !== members.length) {
       alert("メンバー名が重複しています。\nそれぞれ別の名前を入力してください（例: 田中A, 田中B）。");
@@ -288,7 +285,7 @@
     let itemsText = ""; 
     let detailText = ""; 
     let detailsArr = []; 
-    let hasNegativeError = false; // マイナス値エラーフラグ
+    let hasNegativeError = false;
 
     // 各行の集計
     const expenseRows = document.querySelectorAll('.expense-row');
@@ -298,12 +295,12 @@
       const amountInput = row.querySelector('.amount-input');
       const amount = parseInt(amountInput.value) || 0;
       
-      // マイナス値チェック (★追加)
+      // マイナス値チェック
       if (amount < 0) {
         alert(`項目「${name}」の金額がマイナスになっています。\n正しい金額を入力してください。`);
-        amountInput.classList.add('is-invalid'); // 赤枠などを出す場合
+        amountInput.classList.add('is-invalid');
         hasNegativeError = true;
-        break; // ループを抜ける
+        break; 
       } else {
         amountInput.classList.remove('is-invalid');
       }
@@ -312,7 +309,6 @@
         payments[payerIdx] += amount;
         totalAmount += amount;
 
-        // ガソリン行かどうかの判定と情報取得
         if (row.classList.contains('gas-row')) {
           const d = row.querySelector('.gas-dist').value;
           const e = row.querySelector('.gas-eff').value;
@@ -335,8 +331,7 @@
       }
     }
 
-    if (hasNegativeError) return; // エラーがあれば中断
-
+    if (hasNegativeError) return;
     if (totalAmount === 0) return alert("金額が入力されていません。");
 
     // メンバーごとの支払合計表示用
@@ -347,10 +342,9 @@
 
     // --- 債権債務の計算アルゴリズム ---
     const memberCount = members.length;
-    const baseShare = Math.floor(totalAmount / memberCount); // 1人あたりの負担額
-    const remainder = totalAmount % memberCount; // 割り切れない端数
+    const baseShare = Math.floor(totalAmount / memberCount); 
+    const remainder = totalAmount % memberCount; 
     
-    // バランス計算 (プラスなら払いすぎ=受取れる、マイナスなら不足=支払う)
     const balances = payments.map((paid, idx) => {
       const burden = baseShare + (idx < remainder ? 1 : 0);
       return { id: idx, name: members[idx], balance: paid - burden };
@@ -363,7 +357,6 @@
     let creditorIdx = 0; 
     let debtorIdx = 0;
 
-    // 貪欲法によるマッチング
     while (creditorIdx < creditors.length && debtorIdx < debtors.length) {
       const cred = creditors[creditorIdx];
       const debt = debtors[debtorIdx];
@@ -403,7 +396,7 @@
       });
     }
     calculatedMsg += `----------------`;
-    calculatedMsg += `\n\n▼このBotを友だち追加\nhttps://lin.ee/A8jCBxs`;
+    // ★変更点: ここではリンクを付与しない (プレビュー用)
 
     // 結果表示
     document.getElementById('resultContent').innerText = calculatedMsg;
@@ -432,7 +425,6 @@
     if (!CONFIG.GAS_URL) return alert("システムエラー: GAS_URLが設定されていません");
     
     const btn = document.getElementById('sendBtn');
-    // ★二重送信防止処理 (再確認済み)
     btn.disabled = true;
     btn.innerText = "送信中...";
 
@@ -444,9 +436,13 @@
       body: JSON.stringify(logData)
     }).catch(e => console.error("Log send error:", e));
 
+    // ★変更点: 送信直前にリンクを結合する
+    const footerLink = `\n\n▼このBotを友だち追加\nhttps://lin.ee/A8jCBxs`;
+    const finalMsg = calculatedMsg + footerLink;
+
     // 2. LINE ShareTargetPicker 起動
     if (liff.isApiAvailable('shareTargetPicker')) {
-      liff.shareTargetPicker([{ type: "text", text: calculatedMsg }])
+      liff.shareTargetPicker([{ type: "text", text: finalMsg }])
       .then(res => { 
         if (res) { 
           alert("送信しました！"); 
@@ -463,7 +459,7 @@
         btn.innerText = "結果をLINEで送信";
       });
     } else {
-      liff.sendMessages([{ type: 'text', text: calculatedMsg }])
+      liff.sendMessages([{ type: 'text', text: finalMsg }])
       .then(() => { 
         alert("Botとのトークルームに送信しました。"); 
         liff.closeWindow(); 
