@@ -46,12 +46,12 @@
     }
     .delete-btn:active { background-color: #ffe0e0; }
     
-    /* 総額カード (さらにコンパクト化) */
+    /* 総額カード */
     .total-card {
         margin-bottom: 1rem !important;
     }
     .total-card .card-body {
-        padding: 0.6rem 1rem !important; /* 上下パディングを削減 */
+        padding: 0.6rem 1rem !important;
     }
     .total-card small {
         display: block;
@@ -213,7 +213,7 @@
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <p class="small text-muted mb-2">以下の内容で精算し、LINEに送信しますか？<br>（送信後、旅行データはログに移動されます）</p>
+        <p class="small text-muted mb-2">以下の内容で精算し、LINEに送信しますか？</p>
         <textarea class="form-control mb-3" id="settlePreviewText" rows="10" readonly></textarea>
         <button type="button" class="btn btn-success w-100 fw-bold py-3" onclick="onFinalSettle()">
           LINEに送って完了する
@@ -243,7 +243,7 @@
   let currentItems = []; 
   let roomInfo = {};
   
-  // 送信用メッセージ（プレビュー用と送信用で分けるためオブジェクト管理）
+  // 送信用メッセージ
   let settleMessageData = {
       body: "",
       footer: ""
@@ -412,11 +412,9 @@
   function onPreSettle() {
     if (currentItems.length === 0) return alert("精算するデータがありません。");
 
-    // 精算ロジックの実行
     const result = calculateSettlement(currentMembers, currentItems);
-    settleMessageData = result; // 結果を保存
+    settleMessageData = result; 
 
-    // プレビューには本文のみ表示（リンクなし）
     document.getElementById('settlePreviewText').value = settleMessageData.body;
     const modal = new bootstrap.Modal(document.getElementById('settleModal'));
     modal.show();
@@ -431,7 +429,6 @@
     showLoading(true, "LINE送信＆サーバー保存中...");
 
     try {
-      // 本文 + フッター（リンク等）を結合
       const finalMsg = settleMessageData.body + settleMessageData.footer;
 
       // (1) LINE送信
@@ -480,7 +477,6 @@
   // 計算ロジック
   // ==========================================
   function calculateSettlement(members, items) {
-    // 1. 集計
     const payments = {}; 
     members.forEach(m => payments[m] = 0);
     
@@ -496,7 +492,6 @@
       detailsText += `・${item.item}: ¥${amount.toLocaleString()} (${item.payer})\n`;
     });
 
-    // 2. 債権債務計算
     const memberCount = members.length;
     const baseShare = Math.floor(totalAmount / memberCount);
     const remainder = totalAmount % memberCount;
@@ -525,7 +520,6 @@
       if (Math.abs(debt.balance) < 1) debtorIdx++;
     }
 
-    // 3. メッセージ構築 (BodyとFooterを分離)
     let msg = `【旅行精算: ${roomInfo.title}】\n\n`;
     msg += `■総額: ¥${totalAmount.toLocaleString()}\n`;
     msg += `■1人あたり: 約¥${baseShare.toLocaleString()}\n\n`;
@@ -545,7 +539,6 @@
     }
     msg += `----------------\n\n[内訳]\n${detailsText}`;
     
-    // フッター（リンクなど）
     const footer = `\n▼このBotを友だち追加\nhttps://lin.ee/A8jCBxs`;
 
     return { body: msg, footer: footer, total: totalAmount };
@@ -588,14 +581,10 @@
         const div = document.createElement('div');
         div.className = `timeline-item type-${item.type}`;
         
-        // ★日付表示の処理
-        // GAS修正により「2023/10/01 12:00:00」というJST文字列がそのまま来る
         let dateStr = "";
         if (typeof item.date === 'string' && item.date.match(/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/)) {
-            // 文字列の場合: 先頭の"2023/"を削り、秒を削る -> "10/01 12:00"
             dateStr = item.date.substring(5, 16); 
         } else {
-            // Dateオブジェクトの場合(旧データ等): フォーマット
             dateStr = new Date(item.date).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         }
 
