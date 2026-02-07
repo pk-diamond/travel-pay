@@ -28,7 +28,7 @@
     .item-title { font-weight: bold; font-size: 1.1rem; color: #333; }
     .item-amount { font-weight: bold; font-size: 1.3rem; color: #333; }
     
-    /* 削除ボタンエリア（修正版） */
+    /* 削除ボタンエリア */
     .item-footer {
       text-align: right;
       border-top: 1px dashed #eee;
@@ -59,6 +59,15 @@
       position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
       background: rgba(255,255,255,0.9); z-index: 9999; 
       display: flex; align-items: center; justify-content: center; flex-direction: column; 
+    }
+    
+    /* 精算プレビューのテキストエリア */
+    #settlePreviewText {
+      background-color: #f8f9fa;
+      border: 1px solid #dee2e6;
+      font-family: monospace;
+      font-size: 0.9rem;
+      white-space: pre-wrap; /* 改行を反映 */
     }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -109,7 +118,7 @@
   <button class="btn btn-primary flex-grow-1 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addModal">
     ＋ 立替を追加
   </button>
-  <button class="btn btn-outline-danger fw-bold" onclick="onSettle()">
+  <button class="btn btn-outline-danger fw-bold" onclick="onPreSettle()">
     💰 精算して終了
   </button>
 </div>
@@ -132,7 +141,7 @@
           </div>
           <div class="mb-3">
             <label class="form-label small fw-bold">何に使いましたか？</label>
-            <input type="text" class="form-control" id="inputItem" placeholder="例: ランチ代、お土産">
+            <input type="text" class="form-control" id="inputItem" placeholder="例: ランチ代、ガソリン調整金">
           </div>
           <div class="mb-4">
             <label class="form-label small fw-bold">いくらですか？</label>
@@ -145,6 +154,25 @@
             追加する
           </button>
         </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 精算プレビューモーダル（新規追加） -->
+<div class="modal fade" id="settleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title fw-bold">精算プレビュー</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">以下の内容で精算し、LINEに送信しますか？<br>（送信後、旅行データはログに移動されます）</p>
+        <textarea class="form-control mb-3" id="settlePreviewText" rows="10" readonly></textarea>
+        <button type="button" class="btn btn-success w-100 fw-bold py-3" onclick="onFinalSettle()">
+          LINEに送って完了する
+        </button>
       </div>
     </div>
   </div>
@@ -168,7 +196,9 @@
   // ==========================================
   let currentRoomId = "";
   let currentMembers = [];
+  let currentItems = []; // 精算計算用に保持
   let roomInfo = {};
+  let calculatedMsg = ""; // LINE送信用のメッセージ
 
   // ==========================================
   // 初期化処理
@@ -246,7 +276,6 @@
     if (!item) return alert("項目名を入力してください");
     if (amount <= 0) return alert("正しい金額を入力してください");
 
-    // モーダルを閉じる
     const modalEl = document.getElementById('addModal');
     const modal = bootstrap.Modal.getInstance(modalEl);
     modal.hide();
@@ -269,10 +298,8 @@
 
       const data = await response.json();
       if (data.result === 'success') {
-        // 入力フォームクリア
         document.getElementById('inputItem').value = "";
         document.getElementById('inputAmount').value = "";
-        // 再読み込みして反映
         await fetchRoomData();
       } else {
         alert("保存に失敗しました:\n" + data.message);
@@ -314,13 +341,48 @@
     }
   }
 
-  // 4. 精算して終了 (Settle)
-  async function onSettle() {
-    if (!confirm("旅行を終了して精算しますか？\n\nこれまでのデータが集計され、ログとして保存されます。\n（この操作は取り消せません）")) return;
+  // 4. 精算プレビュー (Pre-Settle)
+  function onPreSettle() {
+    if (currentItems.length === 0) return alert("精算するデータがありません。");
 
-    showLoading(true, "精算処理中...\nこれには数秒かかります");
+    // 精算ロジックの実行
+    const result = calculateSettlement(currentMembers, currentItems);
+    calculatedMsg = result.message;
+
+    // モーダル表示
+    document.getElementById('settlePreviewText').value = calculatedMsg;
+    const modal = new bootstrap.Modal(document.getElementById('settleModal'));
+    modal.show();
+  }
+
+  // 5. 最終精算＆送信 (Final Settle)
+  async function onFinalSettle() {
+    const modalEl = document.getElementById('settleModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    modal.hide();
+
+    showLoading(true, "LINE送信＆サーバー保存中...");
 
     try {
+      // (1) LINE送信
+      let lineSent = false;
+      if (liff.isApiAvailable('shareTargetPicker')) {
+        const res = await liff.shareTargetPicker([{ type: "text", text: calculatedMsg }]);
+        if (res) lineSent = true;
+      } else {
+        // Fallback: トークルーム内送信
+        await liff.sendMessages([{ type: 'text', text: calculatedMsg }]);
+        lineSent = true;
+      }
+
+      if (!lineSent) {
+        if(!confirm("LINE送信がキャンセルされましたが、\n精算を完了してログを保存しますか？")) {
+           showLoading(false);
+           return;
+        }
+      }
+
+      // (2) GASへ保存リクエスト
       const response = await fetch(CONFIG.GAS_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
@@ -332,21 +394,100 @@
 
       const data = await response.json();
       if (data.result === 'success') {
-        alert(`精算が完了しました！\n総額: ¥${data.data.total.toLocaleString()}\n\nメニュー画面に戻ります。`);
-        
-        // セッションクリア
+        alert("精算が完了しました！\nメニュー画面に戻ります。");
         localStorage.removeItem('trip_room_id');
         localStorage.removeItem('trip_title');
-        
         window.location.href = "index.html";
       } else {
-        alert("精算処理に失敗しました:\n" + data.message);
+        alert("サーバー保存に失敗しました:\n" + data.message);
       }
+
     } catch (e) {
-      alert("通信エラーが発生しました。");
+      console.error(e);
+      alert("処理中にエラーが発生しました。");
     } finally {
       showLoading(false);
     }
+  }
+
+  // ==========================================
+  // 計算ロジック (Algorithm)
+  // ==========================================
+  function calculateSettlement(members, items) {
+    // 1. 集計
+    const payments = {}; 
+    members.forEach(m => payments[m] = 0);
+    
+    let totalAmount = 0;
+    let detailsText = "";
+
+    items.forEach(item => {
+      const amount = parseInt(item.amount) || 0;
+      if(payments[item.payer] !== undefined) {
+        payments[item.payer] += amount;
+      }
+      totalAmount += amount;
+      detailsText += `・${item.item}: ¥${amount.toLocaleString()} (${item.payer})\n`;
+    });
+
+    // 2. 債権債務計算
+    const memberCount = members.length;
+    const baseShare = Math.floor(totalAmount / memberCount);
+    const remainder = totalAmount % memberCount;
+
+    // paymentsオブジェクトを配列に変換して計算
+    const balances = members.map((name, idx) => {
+      const paid = payments[name];
+      // 端数はメンバー登録順(idx)で調整（0,1,2...の人に1円ずつ加算）
+      const burden = baseShare + (idx < remainder ? 1 : 0);
+      return { name: name, balance: paid - burden, paid: paid };
+    });
+
+    const creditors = balances.filter(b => b.balance > 0).sort((a,b) => b.balance - a.balance);
+    const debtors = balances.filter(b => b.balance < 0).sort((a,b) => a.balance - b.balance);
+
+    let transactions = [];
+    let creditorIdx = 0;
+    let debtorIdx = 0;
+
+    while (creditorIdx < creditors.length && debtorIdx < debtors.length) {
+      const cred = creditors[creditorIdx];
+      const debt = debtors[debtorIdx];
+      const amount = Math.min(cred.balance, Math.abs(debt.balance));
+      
+      if (amount > 0) {
+        transactions.push({ from: debt.name, to: cred.name, amount: amount });
+      }
+      
+      cred.balance -= amount;
+      debt.balance += amount;
+      
+      if (Math.abs(cred.balance) < 1) creditorIdx++;
+      if (Math.abs(debt.balance) < 1) debtorIdx++;
+    }
+
+    // 3. メッセージ構築
+    let msg = `【旅行精算: ${roomInfo.title}】\n\n`;
+    msg += `■総額: ¥${totalAmount.toLocaleString()}\n`;
+    msg += `■1人あたり: 約¥${baseShare.toLocaleString()}\n\n`;
+    
+    msg += `[メンバー別支払済額]\n`;
+    balances.forEach(b => {
+      msg += `・${b.name}: ¥${b.paid.toLocaleString()}\n`;
+    });
+
+    msg += `\n----------------\n【精算方法】\n`;
+    if (transactions.length === 0) {
+      msg += `精算なし（全員等しく支払いました）\n`;
+    } else {
+      transactions.forEach(t => {
+        msg += `● ${t.from} → ${t.to} : ¥${t.amount.toLocaleString()}\n`;
+      });
+    }
+    msg += `----------------\n\n[内訳]\n${detailsText}`;
+    msg += `\n▼このBotを友だち追加\nhttps://lin.ee/A8jCBxs`;
+
+    return { message: msg, total: totalAmount };
   }
 
   // ==========================================
@@ -355,12 +496,13 @@
   function renderDashboard(data) {
     roomInfo = data.roomInfo;
     const items = data.items;
+    currentItems = items; // 計算用に保存
     currentMembers = roomInfo.members;
 
     // ヘッダー情報更新
     document.getElementById('tripTitle').innerText = roomInfo.title;
     
-    // プルダウン更新（初回のみ、またはメンバー変更対応）
+    // プルダウン更新
     const select = document.getElementById('inputPayer');
     if (select.options.length === 0) {
       currentMembers.forEach(m => {
