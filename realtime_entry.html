@@ -60,11 +60,12 @@
       <div class="card">
         <div class="card-body p-4">
           <h5 class="card-title fw-bold mb-3">旅行に参加する</h5>
-          <p class="small text-muted mb-4">共有された「ルームID」を入力してください。</p>
+          <p class="small text-muted mb-4">共有された「ルームID（4桁の数字）」を入力してください。</p>
           
           <div class="mb-3">
             <label class="form-label fw-bold-label">ルームID</label>
-            <input type="text" class="form-control form-control-lg text-uppercase" id="joinRoomId" placeholder="TRIP-XXXX" maxlength="20">
+            <!-- ★修正: 数字入力に特化 -->
+            <input type="tel" class="form-control form-control-lg" id="joinRoomId" placeholder="1234" maxlength="4" pattern="\d*">
           </div>
           
           <button class="btn btn-success w-100 py-3 fw-bold shadow-sm" onclick="onJoinRoom()">
@@ -127,7 +128,6 @@
     // デプロイしたGASのURLを確認して更新してください
     GAS_URL: "https://script.google.com/macros/s/AKfycbxK0YaFYVlqwa0F_foz-2WlguFEyrpry1dvKJ6vmDGdPkpWlfDsaWb9vQuaiHdRMC1n/exec",
     LIFF_ID: "2008842942-XFy8Tty3",
-    // 次の画面（ダッシュボード）のファイル名
     NEXT_PAGE: "realtime_dashboard.html"
   };
 
@@ -135,17 +135,13 @@
   // 初期化
   // ==========================================
   window.onload = function() {
-    // メンバー入力欄の初期化
     updateMemberInputs();
 
-    // 既にログイン済み（LocalStorageにIDがある）なら自動遷移するロジックを
-    // ここに入れることも可能ですが、今回はテストしやすくするため手動入力のままにします。
     const savedRoomId = localStorage.getItem('trip_room_id');
     if (savedRoomId) {
         document.getElementById('joinRoomId').value = savedRoomId;
     }
 
-    // LIFF初期化 (今はログインチェックのみ)
     liff.init({ liffId: CONFIG.LIFF_ID }).then(() => {
       if (!liff.isLoggedIn()) {
         liff.login();
@@ -199,7 +195,6 @@
 
     if (hasEmpty) return alert("全員の名前を入力してください");
 
-    // 重複チェック
     if (new Set(members).size !== members.length) {
         return alert("メンバー名が重複しています。別の名前にしてください。");
     }
@@ -215,15 +210,9 @@
             members: members
         };
 
-        // GASへ送信
-        // ※今回はAPIとして結果を受け取るため、mode: 'cors' が理想ですが、
-        // GASの仕様上CORSエラーが出やすいため、no-corsではなく
-        // テキストレスポンスを期待して単純なPOSTを行います。
-        // ★重要: GAS側は ContentService.createTextOutput でJSONを返す必要があります。
-        
         const response = await fetch(CONFIG.GAS_URL, {
             method: "POST",
-            headers: { "Content-Type": "text/plain" }, // application/jsonだとCORSで弾かれることがあるためtext/plain推奨
+            headers: { "Content-Type": "text/plain" },
             body: JSON.stringify(payload)
         });
         
@@ -231,9 +220,9 @@
 
         if (data.result === 'success') {
             const roomId = data.data.roomId;
-            alert(`ルームが作成されました！\nID: ${roomId}`);
+            // 4桁IDになったことを伝えるメッセージに変更
+            alert(`ルームが作成されました！\nID: ${roomId}\n\nこの数字をメンバーに共有してください。`);
             
-            // LocalStorageに保存して遷移
             saveSession(roomId, data.data.title);
             window.location.href = CONFIG.NEXT_PAGE;
         } else {
@@ -242,7 +231,7 @@
 
     } catch (e) {
         console.error(e);
-        alert("通信エラーが発生しました。\n・URLが正しいか\n・インターネット接続\nを確認してください。");
+        alert("通信エラーが発生しました。");
     } finally {
         showLoading(false);
     }
@@ -250,7 +239,8 @@
 
   // 2. ルーム参加 (Join)
   async function onJoinRoom() {
-    const roomId = document.getElementById('joinRoomId').value.trim().toUpperCase();
+    // 文字列としてトリムし、数字以外は一応許容するがサーバーでチェック
+    const roomId = document.getElementById('joinRoomId').value.trim();
     if (!roomId) return alert("ルームIDを入力してください");
 
     showLoading(true, "ルームを探しています...");
@@ -273,7 +263,6 @@
             const roomInfo = data.data.roomInfo;
             alert(`「${roomInfo.title}」に参加します。`);
             
-            // LocalStorageに保存して遷移
             saveSession(roomId, roomInfo.title);
             window.location.href = CONFIG.NEXT_PAGE;
         } else {
@@ -288,7 +277,6 @@
     }
   }
 
-  // セッション保存ヘルパー
   function saveSession(roomId, title) {
     localStorage.setItem('trip_room_id', roomId);
     localStorage.setItem('trip_title', title);
