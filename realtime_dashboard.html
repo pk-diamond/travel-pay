@@ -7,16 +7,16 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     body { background-color: #f8f9fa; color: #333; font-family: sans-serif; padding-bottom: 100px; }
-    .container { max-width: 600px; margin-top: 15px; } /* 上部マージン削減 */
+    .container { max-width: 600px; margin-top: 15px; }
     
-    /* タイムラインアイテム (コンパクト化) */
+    /* タイムラインアイテム */
     .timeline-item {
       background: #fff;
-      border-radius: 10px; /* 角丸を少し小さく */
-      padding: 10px 12px; /* パディングを縮小 (15px -> 10px/12px) */
-      margin-bottom: 8px; /* 下マージンを縮小 (12px -> 8px) */
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-      border-left: 4px solid #198754; /* 線の太さを少し細く */
+      border-left: 4px solid #198754;
     }
     .timeline-item.type-gas { border-left-color: #0d6efd; }
     
@@ -32,26 +32,35 @@
     .item-footer {
       text-align: right;
       border-top: 1px dashed #eee;
-      padding-top: 4px; /* 余白縮小 */
+      padding-top: 4px;
     }
     .delete-btn {
       display: inline-block;
       font-size: 0.75rem; 
       color: #dc3545; 
       cursor: pointer;
-      padding: 2px 8px; /* ボタンサイズ縮小 */
+      padding: 2px 8px;
       background-color: #fff5f5;
       border-radius: 12px;
       transition: background-color 0.2s;
     }
     .delete-btn:active { background-color: #ffe0e0; }
     
-    /* 総額カード (コンパクト化) */
+    /* 総額カード (さらにコンパクト化) */
     .total-card {
-        margin-bottom: 1rem !important; /* mb-4 -> mb-3相当に強制 */
+        margin-bottom: 1rem !important;
     }
     .total-card .card-body {
-        padding: 1rem !important; /* py-3 -> 1rem */
+        padding: 0.6rem 1rem !important; /* 上下パディングを削減 */
+    }
+    .total-card small {
+        display: block;
+        margin-bottom: 0;
+        line-height: 1.2;
+    }
+    .total-card h2 {
+        line-height: 1.1;
+        margin-top: 2px;
     }
 
     /* フッターアクションバー */
@@ -579,14 +588,14 @@
         const div = document.createElement('div');
         div.className = `timeline-item type-${item.type}`;
         
-        // ★日付表示の修正 (タイムゾーン対応)
-        // GASからの形式が "yyyy/MM/dd HH:mm:ss" であることを前提に文字列処理を行う
+        // ★日付表示の処理
+        // GAS修正により「2023/10/01 12:00:00」というJST文字列がそのまま来る
         let dateStr = "";
         if (typeof item.date === 'string' && item.date.match(/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/)) {
-            // "2023/10/01 12:00:00" -> "10/01 12:00"
+            // 文字列の場合: 先頭の"2023/"を削り、秒を削る -> "10/01 12:00"
             dateStr = item.date.substring(5, 16); 
         } else {
-            // フォールバック: 従来通りDateパース
+            // Dateオブジェクトの場合(旧データ等): フォーマット
             dateStr = new Date(item.date).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         }
 
