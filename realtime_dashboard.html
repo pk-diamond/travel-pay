@@ -139,10 +139,38 @@
               <!-- JSで動的に追加 -->
             </select>
           </div>
+          
           <div class="mb-3">
             <label class="form-label small fw-bold">何に使いましたか？</label>
-            <input type="text" class="form-control" id="inputItem" placeholder="例: ランチ代、ガソリン調整金">
+            <input type="text" class="form-control" id="inputItem" placeholder="例: ランチ代、お土産">
           </div>
+
+          <!-- ガソリン計算機能 -->
+          <div class="mb-3 border rounded p-2 bg-light">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="toggleGasCalc" onchange="toggleGasInputs()">
+              <label class="form-check-label small fw-bold" for="toggleGasCalc">⛽ ガソリン代を計算して入力</label>
+            </div>
+            
+            <div id="gasInputs" class="mt-2 d-none">
+              <div class="input-group input-group-sm mb-2">
+                <span class="input-group-text" style="width: 60px;">距離</span>
+                <input type="number" class="form-control" id="gasDist" placeholder="km" oninput="calculateGas()">
+              </div>
+              <div class="input-group input-group-sm mb-2">
+                <span class="input-group-text" style="width: 60px;">燃費</span>
+                <input type="number" class="form-control" id="gasEff" placeholder="km/L" oninput="calculateGas()">
+              </div>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text" style="width: 60px;">単価</span>
+                <input type="number" class="form-control" id="gasPrice" placeholder="円/L" oninput="calculateGas()">
+              </div>
+              <div class="text-end mt-1">
+                 <small class="text-muted" style="font-size: 0.75rem;" id="gasCalcResult">計算結果: 0 円</small>
+              </div>
+            </div>
+          </div>
+
           <div class="mb-4">
             <label class="form-label small fw-bold">いくらですか？</label>
             <div class="input-group">
@@ -159,7 +187,7 @@
   </div>
 </div>
 
-<!-- 精算プレビューモーダル（新規追加） -->
+<!-- 精算プレビューモーダル -->
 <div class="modal fade" id="settleModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow">
@@ -267,6 +295,48 @@
     }
   }
 
+  // ガソリン計算ロジック (UI)
+  function toggleGasInputs() {
+    const isChecked = document.getElementById('toggleGasCalc').checked;
+    const div = document.getElementById('gasInputs');
+    if (isChecked) {
+      div.classList.remove('d-none');
+      // 自動入力の補助
+      const itemInput = document.getElementById('inputItem');
+      if (!itemInput.value) {
+        itemInput.value = "ガソリン代";
+      }
+    } else {
+      div.classList.add('d-none');
+    }
+  }
+
+  function calculateGas() {
+    const d = parseFloat(document.getElementById('gasDist').value) || 0;
+    const e = parseFloat(document.getElementById('gasEff').value) || 0;
+    const p = parseFloat(document.getElementById('gasPrice').value) || 0;
+    
+    // 燃費eが0のときは計算しない(無限大回避)
+    let total = 0;
+    if (e > 0) {
+      total = Math.floor((d / e) * p);
+    }
+
+    // 金額欄に反映
+    document.getElementById('inputAmount').value = total;
+    
+    // 計算結果表示の更新
+    document.getElementById('gasCalcResult').innerText = `${d}km ÷ ${e}km/L × ${p}円 = ${total} 円`;
+
+    // 項目名に詳細を追記するロジック（オプション）
+    // 既にユーザーが独自のことを書いていなければ、詳細情報を付記する
+    const itemInput = document.getElementById('inputItem');
+    const baseText = "ガソリン代";
+    if (itemInput.value.startsWith(baseText)) {
+       itemInput.value = `${baseText} (${d}km/${e}kml/@${p}円)`;
+    }
+  }
+
   // 2. アイテム追加 (Add Item)
   async function onAddItem() {
     const payer = document.getElementById('inputPayer').value;
@@ -281,6 +351,10 @@
     modal.hide();
 
     showLoading(true, "保存しています...");
+    
+    // ガソリンフラグの判定
+    const isGas = document.getElementById('toggleGasCalc').checked;
+    const type = isGas ? 'gas' : 'normal';
 
     try {
       const response = await fetch(CONFIG.GAS_URL, {
@@ -292,14 +366,22 @@
           payer: payer,
           item: item,
           amount: amount,
-          type: 'normal'
+          type: type
         })
       });
 
       const data = await response.json();
       if (data.result === 'success') {
+        // 入力フォームクリア
         document.getElementById('inputItem').value = "";
         document.getElementById('inputAmount').value = "";
+        // ガソリン欄リセット
+        document.getElementById('toggleGasCalc').checked = false;
+        document.getElementById('gasInputs').classList.add('d-none');
+        document.getElementById('gasDist').value = "";
+        document.getElementById('gasEff').value = "";
+        document.getElementById('gasPrice').value = "";
+
         await fetchRoomData();
       } else {
         alert("保存に失敗しました:\n" + data.message);
