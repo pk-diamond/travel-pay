@@ -13,8 +13,8 @@
     .timeline-item {
       background: #fff;
       border-radius: 10px;
-      padding: 4px 12px;
-      margin-bottom: 4px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.05);
       border-left: 4px solid #198754;
     }
@@ -306,13 +306,14 @@
     }
   }
 
-  // ガソリン計算UI
+  // ガソリン計算UI (★修正箇所)
   function toggleGasInputs() {
     const isChecked = document.getElementById('toggleGasCalc').checked;
     const div = document.getElementById('gasInputs');
     if (isChecked) {
       div.classList.remove('d-none');
       const itemInput = document.getElementById('inputItem');
+      // デフォルト入力支援（空の場合のみ）
       if (!itemInput.value) itemInput.value = "ガソリン代";
     } else {
       div.classList.add('d-none');
@@ -323,14 +324,29 @@
     const d = parseFloat(document.getElementById('gasDist').value) || 0;
     const e = parseFloat(document.getElementById('gasEff').value) || 0;
     const p = parseFloat(document.getElementById('gasPrice').value) || 0;
+    
     let total = 0;
     if (e > 0) total = Math.floor((d / e) * p);
+    
+    // 金額欄の自動入力
     document.getElementById('inputAmount').value = total;
     document.getElementById('gasCalcResult').innerText = `${d}km ÷ ${e}km/L × ${p}円 = ${total} 円`;
+
+    // 項目名への自動追記ロジック (改修版)
+    // どんな項目名であっても、計算根拠を必ず残す
     const itemInput = document.getElementById('inputItem');
-    const baseText = "ガソリン代";
-    if (itemInput.value.startsWith(baseText)) {
-       itemInput.value = `${baseText} (${d}km/${e}kml/@${p}円)`;
+    let baseName = itemInput.value;
+
+    // 既に自動追記された詳細情報がある場合は、それを削除してベース名を取得
+    // 正規表現で " (数字...)" のパターンを末尾から削除
+    baseName = baseName.replace(/ \([\d\.]+km\/[\d\.]+kml\/@[\d\.]+円\)$/, "");
+
+    // 新しい詳細情報を追記 (数値が入っている場合のみ)
+    if (d > 0 || e > 0 || p > 0) {
+        itemInput.value = `${baseName} (${d}km/${e}kml/@${p}円)`;
+    } else {
+        // 空の場合はベース名に戻す
+        itemInput.value = baseName;
     }
   }
 
@@ -426,7 +442,7 @@
     const modal = bootstrap.Modal.getInstance(modalEl);
     modal.hide();
 
-    showLoading(true, "LINE送信中...");
+    showLoading(true, "LINE送信＆サーバー保存中...");
 
     try {
       const finalMsg = settleMessageData.body + settleMessageData.footer;
