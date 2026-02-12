@@ -367,6 +367,15 @@
     const isGas = document.getElementById('toggleGasCalc').checked;
     const type = isGas ? 'gas' : 'normal';
 
+    // 詳細データの作成 (JSON文字列として準備)
+    let detailStr = "{}";
+    if (isGas) {
+        const d = parseFloat(document.getElementById('gasDist').value) || 0;
+        const e = parseFloat(document.getElementById('gasEff').value) || 0;
+        const p = parseFloat(document.getElementById('gasPrice').value) || 0;
+        detailStr = JSON.stringify({ dist: d, eff: e, price: p });
+    }
+
     try {
       const response = await fetch(CONFIG.GAS_URL, {
         method: "POST",
@@ -377,7 +386,8 @@
           payer: payer,
           item: item,
           amount: amount,
-          type: type
+          type: type,
+          detail: detailStr // ★詳細データを送信
         })
       });
 
