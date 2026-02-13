@@ -23,13 +23,22 @@
     }
     .menu-card:active { transform: scale(0.98); }
     
-    /* ヘルプボタン */
+    /* ヘルプボタン (修正: 視認性向上) */
     .help-btn {
-      color: #adb5bd;
+      font-size: 1.1rem;
+      color: #198754; /* 緑文字 */
+      background-color: #e8f5e9; /* 薄い緑背景 */
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%; /* 丸く */
       cursor: pointer;
-      transition: color 0.2s;
+      transition: background-color 0.2s;
+      font-weight: bold;
     }
-    .help-btn:hover { color: #198754; }
+    .help-btn:hover { background-color: #c8e6c9; }
 
     /* ローディング画面 */
     #loading { 
@@ -62,9 +71,10 @@
     <!-- ヘッダーエリア (タイトル + ヘルプ) -->
     <div class="d-flex justify-content-center align-items-center mb-4 position-relative">
       <h4 class="fw-bold text-success mb-0">旅行精算メニュー</h4>
-      <span class="help-btn position-absolute end-0" data-bs-toggle="modal" data-bs-target="#helpModal" style="font-size: 1.2rem;">
-        <i class="bi bi-question-circle"></i> ?
-      </span>
+      <!-- ヘルプボタン -->
+      <div class="help-btn position-absolute end-0" data-bs-toggle="modal" data-bs-target="#helpModal">
+        ?
+      </div>
     </div>
     
     <p class="text-center text-muted small mb-4">精算方法を選択してください</p>
@@ -73,7 +83,6 @@
     <a href="simple.html" class="text-decoration-none">
       <div class="card menu-card bg-white">
         <h5 class="fw-bold text-success mb-2">🚗 簡易精算</h5>
-        <!-- 案1: 文言変更 -->
         <p class="text-muted small mb-0">その場で合計を割る（登録不要）</p>
       </div>
     </a>
@@ -82,7 +91,6 @@
     <a href="complex.html" class="text-decoration-none">
       <div class="card menu-card bg-light border">
         <h5 class="fw-bold text-secondary mb-2">📊 詳細精算</h5>
-        <!-- 案1: 文言変更 -->
         <p class="text-muted small mb-0">最後にまとめて「誰が誰に？」を計算</p>
       </div>
     </a>
@@ -91,7 +99,6 @@
     <a href="realtime_entry.html" class="text-decoration-none">
       <div class="card menu-card bg-white border border-primary">
         <h5 class="fw-bold text-primary mb-2">⏱️ リアルタイム精算</h5>
-        <!-- 案1: 文言変更 -->
         <p class="text-muted small mb-0">旅行中にみんなで入力＆共有</p>
       </div>
     </a>
@@ -115,6 +122,13 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body pt-2">
+        
+        <!-- 共通機能の説明追加 -->
+        <div class="alert alert-success bg-opacity-10 border-0 p-2 mb-3 text-center small">
+          <strong>💡 共通機能</strong><br>
+          どのモードでも、計算結果を<br>LINEで友だちに送信・共有できます。
+        </div>
+
         <div class="list-group list-group-flush">
           
           <div class="list-group-item border-0 px-0 py-3">
