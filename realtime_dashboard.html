@@ -47,21 +47,10 @@
     .delete-btn:active { background-color: #ffe0e0; }
     
     /* 総額カード */
-    .total-card {
-        margin-bottom: 1rem !important;
-    }
-    .total-card .card-body {
-        padding: 0.6rem 1rem !important;
-    }
-    .total-card small {
-        display: block;
-        margin-bottom: 0;
-        line-height: 1.2;
-    }
-    .total-card h2 {
-        line-height: 1.1;
-        margin-top: 2px;
-    }
+    .total-card { margin-bottom: 1rem !important; }
+    .total-card .card-body { padding: 0.6rem 1rem !important; }
+    .total-card small { display: block; margin-bottom: 0; line-height: 1.2; }
+    .total-card h2 { line-height: 1.1; margin-top: 2px; }
 
     /* フッターアクションバー */
     .action-bar {
@@ -77,14 +66,8 @@
       background: rgba(255,255,255,0.9); z-index: 9999; 
       display: flex; align-items: center; justify-content: center; flex-direction: column; 
     }
-    
-    /* 精算プレビューのテキストエリア */
     #settlePreviewText {
-      background-color: #f8f9fa;
-      border: 1px solid #dee2e6;
-      font-family: monospace;
-      font-size: 0.85rem;
-      white-space: pre-wrap;
+      background-color: #f8f9fa; border: 1px solid #dee2e6; font-family: monospace; font-size: 0.85rem; white-space: pre-wrap;
     }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -104,9 +87,7 @@
       <h6 class="text-muted small mb-0">現在進行中の旅行</h6>
       <h4 class="fw-bold text-success" id="tripTitle">読み込み中...</h4>
     </div>
-    <button class="btn btn-sm btn-outline-secondary" onclick="fetchRoomData()">
-      🔄 更新
-    </button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="fetchRoomData()">🔄 更新</button>
   </div>
 
   <!-- 総額表示カード -->
@@ -119,9 +100,7 @@
 
   <!-- タイムラインエリア -->
   <h6 class="fw-bold text-muted small mb-2 ps-1">立替履歴</h6>
-  <div id="timelineArea">
-    <!-- ここにデータが挿入されます -->
-  </div>
+  <div id="timelineArea"></div>
 
   <!-- 空の状態 (チュートリアル) -->
   <div id="emptyState" class="text-center py-5 d-none">
@@ -130,9 +109,7 @@
     </div>
     <h5 class="fw-bold text-dark">ようこそ！</h5>
     <p class="text-muted small mb-4">
-      まだ立替記録がありません。<br>
-      下の <strong>[＋立替を追加]</strong> ボタンから<br>
-      最初の支払いを記録してみましょう。
+      まだ立替記録がありません。<br>下の <strong>[＋立替を追加]</strong> ボタンから<br>最初の支払いを記録してみましょう。
     </p>
     <div class="bg-white rounded p-3 shadow-sm d-inline-block text-start" style="max-width: 280px;">
       <h6 class="fw-bold small text-success mb-2">💡 使い方ヒント</h6>
@@ -150,9 +127,7 @@
   <button class="btn btn-primary flex-grow-1 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addModal">
     ＋ 立替を追加
   </button>
-  <button class="btn btn-outline-danger fw-bold" onclick="onPreSettle()">
-    💰 精算して終了
-  </button>
+  <button class="btn btn-outline-danger fw-bold" onclick="onPreSettle()">💰 精算して終了</button>
 </div>
 
 <!-- 追加モーダル -->
@@ -167,9 +142,7 @@
         <form id="addForm">
           <div class="mb-2">
             <label class="form-label small fw-bold mb-1">誰が払いましたか？</label>
-            <select class="form-select" id="inputPayer">
-              <!-- JSで動的に追加 -->
-            </select>
+            <select class="form-select" id="inputPayer"></select>
           </div>
           
           <div class="mb-2">
@@ -177,7 +150,7 @@
             <input type="text" class="form-control" id="inputItem" placeholder="例: ランチ代、お土産">
           </div>
 
-          <!-- ガソリン計算機能 -->
+          <!-- ★ガソリン計算機能エリア -->
           <div class="mb-3 border rounded p-2 bg-light">
             <div class="form-check form-switch">
               <input class="form-check-input" type="checkbox" id="toggleGasCalc" onchange="toggleGasInputs()">
@@ -185,13 +158,52 @@
             </div>
             
             <div id="gasInputs" class="mt-2 d-none">
+              
+              <!-- ★新規追加：経路検索エリア -->
+              <div class="mb-3 p-2 bg-white border rounded">
+                <div class="small fw-bold mb-2 text-muted">📍 経路から距離を調べる</div>
+                
+                <div class="input-group input-group-sm mb-2">
+                  <button class="btn btn-outline-secondary" type="button" onclick="getCurrentLocation()" id="btnLocation">現在地</button>
+                  <input type="text" class="form-control" id="routeOrigin" placeholder="出発地 (住所や施設名)">
+                </div>
+                
+                <div class="input-group input-group-sm mb-1">
+                  <span class="input-group-text">行先</span>
+                  <input type="text" class="form-control" id="routeDest" placeholder="例: スカイツリー">
+                  <button class="btn btn-secondary fw-bold" type="button" onclick="searchRoute()" id="btnSearchRoute">検索</button>
+                </div>
+                
+                <!-- 検索結果表示 -->
+                <div id="routeResultArea" class="d-none mt-2 p-2 bg-light border rounded">
+                  <div id="routeLoading" class="d-none text-center text-muted small py-1">検索中...</div>
+                  
+                  <div id="routeData" class="d-none">
+                    <div class="text-center mb-1">
+                      <span class="small text-muted">ルート距離: </span>
+                      <strong class="text-primary fs-5" id="resDist">0</strong> <span class="text-primary fw-bold">km</span>
+                    </div>
+                    <div class="text-muted bg-white p-1 rounded border mb-2" style="font-size: 0.65rem; line-height: 1.2;">
+                      認識された目的地:<br><span id="resAddress" class="fw-bold text-dark"></span>
+                      <div class="mt-1" style="font-size: 0.6rem;">※システムが判定した最適ルートです</div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                      <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1 py-1" onclick="applyDistance(1)">➡️ 片道で入力</button>
+                      <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1 py-1" onclick="applyDistance(2)">↔️ 往復で入力</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 既存：手動入力・計算結果エリア -->
               <div class="input-group input-group-sm mb-2">
                 <span class="input-group-text" style="width: 60px;">距離</span>
-                <input type="number" class="form-control" id="gasDist" placeholder="km" oninput="calculateGas()">
+                <input type="number" class="form-control" id="gasDist" placeholder="km" oninput="calculateGas()" step="0.1">
               </div>
               <div class="input-group input-group-sm mb-2">
                 <span class="input-group-text" style="width: 60px;">燃費</span>
-                <input type="number" class="form-control" id="gasEff" placeholder="km/L" oninput="calculateGas()">
+                <input type="number" class="form-control" id="gasEff" placeholder="km/L" oninput="calculateGas()" step="0.1">
               </div>
               <div class="input-group input-group-sm">
                 <span class="input-group-text" style="width: 60px;">単価</span>
@@ -257,12 +269,9 @@
   let currentMembers = [];
   let currentItems = []; 
   let roomInfo = {};
+  let tempRouteDistance = 0; // 検索した距離の一時保存
   
-  // 送信用メッセージ
-  let settleMessageData = {
-      body: "",
-      footer: ""
-  };
+  let settleMessageData = { body: "", footer: "" };
 
   // ==========================================
   // 初期化処理
@@ -278,7 +287,6 @@
     }
 
     if (savedTitle) document.getElementById('tripTitle').innerText = savedTitle;
-
     fetchRoomData();
 
     liff.init({ liffId: CONFIG.LIFF_ID }).then(() => {
@@ -294,10 +302,147 @@
   }
 
   // ==========================================
-  // API連携ロジック
+  // ★経路検索関連のロジック
   // ==========================================
 
-  // 1. データ取得
+  // GPSで現在地を取得
+  function getCurrentLocation() {
+    const btn = document.getElementById('btnLocation');
+    const originInput = document.getElementById('routeOrigin');
+    
+    btn.disabled = true;
+    originInput.value = "取得中...";
+    originInput.disabled = true;
+
+    if (!navigator.geolocation) {
+      alert("お使いの端末は位置情報に対応していません。手動で入力してください。");
+      originInput.value = "";
+      originInput.disabled = false;
+      btn.disabled = false;
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        originInput.value = `${lat},${lng}`; // GASは緯度経度でも受け付ける
+        originInput.disabled = false;
+        btn.disabled = false;
+      },
+      (error) => {
+        let msg = "位置情報の取得に失敗しました。";
+        if (error.code === 1) msg = "位置情報の利用が許可されていません。\nブラウザやLINEの設定を確認するか、手動で入力してください。";
+        else if (error.code === 2) msg = "電波状況が悪く、位置情報が取得できませんでした。";
+        else if (error.code === 3) msg = "取得がタイムアウトしました。";
+        alert(msg);
+        originInput.value = "";
+        originInput.disabled = false;
+        btn.disabled = false;
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }
+
+  // ルート検索の実行
+  async function searchRoute() {
+    const origin = document.getElementById('routeOrigin').value.trim();
+    const dest = document.getElementById('routeDest').value.trim();
+
+    if (!origin || !dest) return alert("出発地と行先を入力してください");
+
+    const resultArea = document.getElementById('routeResultArea');
+    const routeLoading = document.getElementById('routeLoading');
+    const routeData = document.getElementById('routeData');
+    const btnSearch = document.getElementById('btnSearchRoute');
+
+    resultArea.classList.remove('d-none');
+    routeLoading.classList.remove('d-none');
+    routeData.classList.add('d-none');
+    btnSearch.disabled = true;
+
+    try {
+      const response = await fetch(CONFIG.GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: 'calc_distance', origin: origin, destination: dest })
+      });
+
+      const data = await response.json();
+
+      if (data.result === 'success') {
+        tempRouteDistance = parseFloat(data.data.distance);
+        document.getElementById('resDist').innerText = data.data.distance;
+        document.getElementById('resAddress').innerText = data.data.address; // アンサーバック
+        
+        routeLoading.classList.add('d-none');
+        routeData.classList.remove('d-none');
+      } else {
+        alert("検索エラー:\n" + data.message);
+        resultArea.classList.add('d-none');
+      }
+    } catch (e) {
+      alert("通信エラーが発生しました");
+      resultArea.classList.add('d-none');
+    } finally {
+      btnSearch.disabled = false;
+    }
+  }
+
+  // 検索結果を入力欄に反映
+  function applyDistance(multiplier) {
+    if (tempRouteDistance > 0) {
+      const finalDist = (tempRouteDistance * multiplier).toFixed(1);
+      document.getElementById('gasDist').value = finalDist;
+      calculateGas(); // 反映後に金額も再計算
+    }
+  }
+
+  // ==========================================
+  // ガソリン入力UI制御と計算
+  // ==========================================
+  function toggleGasInputs() {
+    const isChecked = document.getElementById('toggleGasCalc').checked;
+    const div = document.getElementById('gasInputs');
+    if (isChecked) {
+      div.classList.remove('d-none');
+      const itemInput = document.getElementById('inputItem');
+      if (!itemInput.value) itemInput.value = "ガソリン代";
+    } else {
+      div.classList.add('d-none');
+      // オフにした時は検索エリアもリセット
+      document.getElementById('routeOrigin').value = "";
+      document.getElementById('routeDest').value = "";
+      document.getElementById('routeResultArea').classList.add('d-none');
+      tempRouteDistance = 0;
+    }
+  }
+
+  function calculateGas() {
+    const d = parseFloat(document.getElementById('gasDist').value) || 0;
+    const e = parseFloat(document.getElementById('gasEff').value) || 0;
+    const p = parseFloat(document.getElementById('gasPrice').value) || 0;
+    
+    let total = 0;
+    if (e > 0) total = Math.floor((d / e) * p);
+    
+    document.getElementById('inputAmount').value = total;
+    document.getElementById('gasCalcResult').innerText = `${d}km ÷ ${e}km/L × ${p}円 = ${total} 円`;
+
+    const itemInput = document.getElementById('inputItem');
+    let baseName = itemInput.value;
+    baseName = baseName.replace(/ \([\d\.]+km\/[\d\.]+kml\/@[\d\.]+円\)$/, "");
+
+    if (d > 0 || e > 0 || p > 0) {
+        itemInput.value = `${baseName} (${d}km/${e}kml/@${p}円)`;
+    } else {
+        itemInput.value = baseName;
+    }
+  }
+
+  // ==========================================
+  // 基本APIロジック (取得・追加・削除・精算)
+  // ==========================================
   async function fetchRoomData() {
     showLoading(true, "データを更新中...");
     try {
@@ -310,62 +455,15 @@
       if (data.result === 'success') {
         renderDashboard(data.data);
       } else {
-        console.error(data);
         alert("データの取得に失敗しました。\n" + data.message);
       }
     } catch (e) {
-      console.error(e);
       alert("通信エラーが発生しました。");
     } finally {
       showLoading(false);
     }
   }
 
-  // ガソリン計算UI (★修正箇所)
-  function toggleGasInputs() {
-    const isChecked = document.getElementById('toggleGasCalc').checked;
-    const div = document.getElementById('gasInputs');
-    if (isChecked) {
-      div.classList.remove('d-none');
-      const itemInput = document.getElementById('inputItem');
-      // デフォルト入力支援（空の場合のみ）
-      if (!itemInput.value) itemInput.value = "ガソリン代";
-    } else {
-      div.classList.add('d-none');
-    }
-  }
-
-  function calculateGas() {
-    const d = parseFloat(document.getElementById('gasDist').value) || 0;
-    const e = parseFloat(document.getElementById('gasEff').value) || 0;
-    const p = parseFloat(document.getElementById('gasPrice').value) || 0;
-    
-    let total = 0;
-    if (e > 0) total = Math.floor((d / e) * p);
-    
-    // 金額欄の自動入力
-    document.getElementById('inputAmount').value = total;
-    document.getElementById('gasCalcResult').innerText = `${d}km ÷ ${e}km/L × ${p}円 = ${total} 円`;
-
-    // 項目名への自動追記ロジック (改修版)
-    // どんな項目名であっても、計算根拠を必ず残す
-    const itemInput = document.getElementById('inputItem');
-    let baseName = itemInput.value;
-
-    // 既に自動追記された詳細情報がある場合は、それを削除してベース名を取得
-    // 正規表現で " (数字...)" のパターンを末尾から削除
-    baseName = baseName.replace(/ \([\d\.]+km\/[\d\.]+kml\/@[\d\.]+円\)$/, "");
-
-    // 新しい詳細情報を追記 (数値が入っている場合のみ)
-    if (d > 0 || e > 0 || p > 0) {
-        itemInput.value = `${baseName} (${d}km/${e}kml/@${p}円)`;
-    } else {
-        // 空の場合はベース名に戻す
-        itemInput.value = baseName;
-    }
-  }
-
-  // 2. アイテム追加
   async function onAddItem() {
     const payer = document.getElementById('inputPayer').value;
     const item = document.getElementById('inputItem').value.trim();
@@ -382,7 +480,6 @@
     const isGas = document.getElementById('toggleGasCalc').checked;
     const type = isGas ? 'gas' : 'normal';
 
-    // 詳細データの作成 (JSON文字列として準備)
     let detailStr = "{}";
     if (isGas) {
         const d = parseFloat(document.getElementById('gasDist').value) || 0;
@@ -396,13 +493,7 @@
         method: "POST",
         headers: { "Content-Type": "text/plain" },
         body: JSON.stringify({
-          action: 'add_item',
-          roomId: currentRoomId,
-          payer: payer,
-          item: item,
-          amount: amount,
-          type: type,
-          detail: detailStr // ★詳細データを送信
+          action: 'add_item', roomId: currentRoomId, payer: payer, item: item, amount: amount, type: type, detail: detailStr
         })
       });
 
@@ -411,7 +502,8 @@
         document.getElementById('inputItem').value = "";
         document.getElementById('inputAmount').value = "";
         document.getElementById('toggleGasCalc').checked = false;
-        document.getElementById('gasInputs').classList.add('d-none');
+        toggleGasInputs(); // フォームを隠してリセット
+        
         document.getElementById('gasDist').value = "";
         document.getElementById('gasEff').value = "";
         document.getElementById('gasPrice').value = "";
@@ -426,7 +518,6 @@
     }
   }
 
-  // 3. アイテム削除
   async function onDeleteItem(uuid, itemName) {
     if (!confirm(`「${itemName}」を削除しますか？`)) return;
     showLoading(true, "削除中...");
@@ -449,30 +540,23 @@
     }
   }
 
-  // 4. 精算プレビュー
   function onPreSettle() {
     if (currentItems.length === 0) return alert("精算するデータがありません。");
-
     const result = calculateSettlement(currentMembers, currentItems);
     settleMessageData = result; 
-
     document.getElementById('settlePreviewText').value = settleMessageData.body;
     const modal = new bootstrap.Modal(document.getElementById('settleModal'));
     modal.show();
   }
 
-  // 5. 最終精算＆送信
   async function onFinalSettle() {
     const modalEl = document.getElementById('settleModal');
     const modal = bootstrap.Modal.getInstance(modalEl);
     modal.hide();
 
     showLoading(true, "LINE送信＆サーバー保存中...");
-
     try {
       const finalMsg = settleMessageData.body + settleMessageData.footer;
-
-      // (1) LINE送信
       let lineSent = false;
       if (liff.isApiAvailable('shareTargetPicker')) {
         const res = await liff.shareTargetPicker([{ type: "text", text: finalMsg }]);
@@ -482,32 +566,22 @@
         lineSent = true;
       }
 
-      if (!lineSent) {
-        if(!confirm("LINE送信がキャンセルされましたが、\n精算を完了してログを保存しますか？")) {
-           showLoading(false);
-           return;
-        }
+      if (!lineSent && !confirm("LINE送信がキャンセルされましたが、\n精算を完了してログを保存しますか？")) {
+         showLoading(false); return;
       }
 
-      // (2) GASへ保存リクエスト
       const response = await fetch(CONFIG.GAS_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({ action: 'settle', roomId: currentRoomId })
+        method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: 'settle', roomId: currentRoomId })
       });
-
       const data = await response.json();
       if (data.result === 'success') {
         alert("精算が完了しました！\nメニュー画面に戻ります。");
-        localStorage.removeItem('trip_room_id');
-        localStorage.removeItem('trip_title');
+        localStorage.removeItem('trip_room_id'); localStorage.removeItem('trip_title');
         window.location.href = "index.html";
       } else {
         alert("サーバー保存に失敗しました:\n" + data.message);
       }
-
     } catch (e) {
-      console.error(e);
       alert("処理中にエラーが発生しました。");
     } finally {
       showLoading(false);
@@ -515,20 +589,15 @@
   }
 
   // ==========================================
-  // 計算ロジック
+  // 計算と描画
   // ==========================================
   function calculateSettlement(members, items) {
-    const payments = {}; 
-    members.forEach(m => payments[m] = 0);
-    
-    let totalAmount = 0;
-    let detailsText = "";
+    const payments = {}; members.forEach(m => payments[m] = 0);
+    let totalAmount = 0; let detailsText = "";
 
     items.forEach(item => {
       const amount = parseInt(item.amount) || 0;
-      if(payments[item.payer] !== undefined) {
-        payments[item.payer] += amount;
-      }
+      if(payments[item.payer] !== undefined) payments[item.payer] += amount;
       totalAmount += amount;
       detailsText += `・${item.item}: ¥${amount.toLocaleString()} (${item.payer})\n`;
     });
@@ -546,106 +615,61 @@
     const creditors = balances.filter(b => b.balance > 0).sort((a,b) => b.balance - a.balance);
     const debtors = balances.filter(b => b.balance < 0).sort((a,b) => a.balance - b.balance);
 
-    let transactions = [];
-    let creditorIdx = 0;
-    let debtorIdx = 0;
-
+    let transactions = []; let creditorIdx = 0; let debtorIdx = 0;
     while (creditorIdx < creditors.length && debtorIdx < debtors.length) {
-      const cred = creditors[creditorIdx];
-      const debt = debtors[debtorIdx];
+      const cred = creditors[creditorIdx]; const debt = debtors[debtorIdx];
       const amount = Math.min(cred.balance, Math.abs(debt.balance));
       if (amount > 0) transactions.push({ from: debt.name, to: cred.name, amount: amount });
-      cred.balance -= amount;
-      debt.balance += amount;
+      cred.balance -= amount; debt.balance += amount;
       if (Math.abs(cred.balance) < 1) creditorIdx++;
       if (Math.abs(debt.balance) < 1) debtorIdx++;
     }
 
-    let msg = `【旅行精算: ${roomInfo.title}】\n\n`;
-    msg += `■総額: ¥${totalAmount.toLocaleString()}\n`;
-    msg += `■1人あたり: 約¥${baseShare.toLocaleString()}\n\n`;
-    
-    msg += `[メンバー別支払済額]\n`;
-    balances.forEach(b => {
-      msg += `・${b.name}: ¥${b.paid.toLocaleString()}\n`;
-    });
-
+    let msg = `【旅行精算: ${roomInfo.title}】\n\n■総額: ¥${totalAmount.toLocaleString()}\n■1人あたり: 約¥${baseShare.toLocaleString()}\n\n[メンバー別支払済額]\n`;
+    balances.forEach(b => msg += `・${b.name}: ¥${b.paid.toLocaleString()}\n`);
     msg += `\n----------------\n【精算方法】\n`;
-    if (transactions.length === 0) {
-      msg += `精算なし（全員等しく支払いました）\n`;
-    } else {
-      transactions.forEach(t => {
-        msg += `● ${t.from} → ${t.to} : ¥${t.amount.toLocaleString()}\n`;
-      });
-    }
+    if (transactions.length === 0) msg += `精算なし（全員等しく支払いました）\n`;
+    else transactions.forEach(t => msg += `● ${t.from} → ${t.to} : ¥${t.amount.toLocaleString()}\n`);
     msg += `----------------\n\n[内訳]\n${detailsText}`;
     
-    const footer = `\n▼このBotを友だち追加\nhttps://lin.ee/A8jCBxs`;
-
-    return { body: msg, footer: footer, total: totalAmount };
+    return { body: msg, footer: `\n▼このBotを友だち追加\nhttps://lin.ee/A8jCBxs`, total: totalAmount };
   }
 
-  // ==========================================
-  // UI描画ロジック
-  // ==========================================
   function renderDashboard(data) {
-    roomInfo = data.roomInfo;
-    const items = data.items;
-    currentItems = items;
-    currentMembers = roomInfo.members;
-
+    roomInfo = data.roomInfo; const items = data.items; currentItems = items; currentMembers = roomInfo.members;
     document.getElementById('tripTitle').innerText = roomInfo.title;
     
     const select = document.getElementById('inputPayer');
     if (select.options.length === 0) {
       currentMembers.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m;
-        opt.text = m;
-        select.appendChild(opt);
+        const opt = document.createElement('option'); opt.value = m; opt.text = m; select.appendChild(opt);
       });
     }
 
-    const timelineArea = document.getElementById('timelineArea');
-    timelineArea.innerHTML = "";
-    
+    const timelineArea = document.getElementById('timelineArea'); timelineArea.innerHTML = "";
     let total = 0;
 
     if (items.length === 0) {
       document.getElementById('emptyState').classList.remove('d-none');
     } else {
       document.getElementById('emptyState').classList.add('d-none');
-      
       items.forEach(item => {
         total += parseInt(item.amount);
-        
-        const div = document.createElement('div');
-        div.className = `timeline-item type-${item.type}`;
-        
+        const div = document.createElement('div'); div.className = `timeline-item type-${item.type}`;
         let dateStr = "";
         if (typeof item.date === 'string' && item.date.match(/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/)) {
             dateStr = item.date.substring(5, 16); 
         } else {
             dateStr = new Date(item.date).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         }
-
         div.innerHTML = `
-          <div class="item-header">
-            <span class="item-payer">${item.payer}</span>
-            <span class="item-date">${dateStr}</span>
-          </div>
-          <div class="item-body">
-            <span class="item-title">${item.item}</span>
-            <span class="item-amount">¥${parseInt(item.amount).toLocaleString()}</span>
-          </div>
-          <div class="item-footer">
-            <span class="delete-btn" onclick="onDeleteItem('${item.uuid}', '${item.item}')">🗑 削除</span>
-          </div>
+          <div class="item-header"><span class="item-payer">${item.payer}</span><span class="item-date">${dateStr}</span></div>
+          <div class="item-body"><span class="item-title">${item.item}</span><span class="item-amount">¥${parseInt(item.amount).toLocaleString()}</span></div>
+          <div class="item-footer"><span class="delete-btn" onclick="onDeleteItem('${item.uuid}', '${item.item}')">🗑 削除</span></div>
         `;
         timelineArea.appendChild(div);
       });
     }
-
     document.getElementById('totalAmount').innerText = total.toLocaleString();
   }
 </script>
