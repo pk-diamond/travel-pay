@@ -170,7 +170,7 @@
                 
                 <div class="input-group input-group-sm mb-1">
                   <span class="input-group-text">行先</span>
-                  <input type="text" class="form-control" id="routeDest" placeholder="例: スカイツリー">
+                  <input type="text" class="form-control" id="routeDest" placeholder="例: 野沢温泉スキー場">
                   <button class="btn btn-secondary fw-bold" type="button" onclick="searchRoute()" id="btnSearchRoute">検索</button>
                 </div>
                 
@@ -219,14 +219,17 @@
           <div class="mb-4">
             <div class="d-flex justify-content-between align-items-end mb-1">
               <label class="form-label small fw-bold mb-0">いくらですか？</label>
-              <button type="button" class="btn btn-sm btn-outline-secondary py-0" style="font-size: 0.75rem;" onclick="toggleCalculator()">🧮 まとめて足す</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary py-0" style="font-size: 0.7rem;" onclick="toggleCalculator()">🧮 複数の金額を合算</button>
             </div>
 
             <!-- ★新規追加：まとめて足し算（ミニ電卓）パネル -->
             <div id="calcPanel" class="d-none bg-light border rounded p-2 mb-2 shadow-sm">
-              <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="d-flex justify-content-between align-items-center mb-1">
                 <span class="small text-muted fw-bold">連続足し算</span>
                 <span class="badge bg-secondary" id="calcSubtotal" style="font-size: 0.85rem;">小計: ¥0</span>
+              </div>
+              <div class="text-muted mb-2" style="font-size: 0.65rem; line-height: 1.3;">
+                💡 <strong>ヒント:</strong> ETCや複数レシートの計算に便利です。金額を打って「＋次へ」を繰り返してください。
               </div>
               <div class="input-group input-group-sm mb-2">
                 <span class="input-group-text">¥</span>
