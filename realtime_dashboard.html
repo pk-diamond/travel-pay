@@ -215,8 +215,30 @@
             </div>
           </div>
 
+          <!-- 金額入力エリア（まとめて足す機能追加） -->
           <div class="mb-4">
-            <label class="form-label small fw-bold mb-1">いくらですか？</label>
+            <div class="d-flex justify-content-between align-items-end mb-1">
+              <label class="form-label small fw-bold mb-0">いくらですか？</label>
+              <button type="button" class="btn btn-sm btn-outline-secondary py-0" style="font-size: 0.75rem;" onclick="toggleCalculator()">🧮 まとめて足す</button>
+            </div>
+
+            <!-- ★新規追加：まとめて足し算（ミニ電卓）パネル -->
+            <div id="calcPanel" class="d-none bg-light border rounded p-2 mb-2 shadow-sm">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="small text-muted fw-bold">連続足し算</span>
+                <span class="badge bg-secondary" id="calcSubtotal" style="font-size: 0.85rem;">小計: ¥0</span>
+              </div>
+              <div class="input-group input-group-sm mb-2">
+                <span class="input-group-text">¥</span>
+                <input type="number" class="form-control" id="calcInput" placeholder="金額を入力">
+                <button class="btn btn-primary fw-bold" type="button" onclick="addCalcValue()">＋ 次へ</button>
+              </div>
+              <div class="d-flex justify-content-between">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearCalc()">クリア</button>
+                <button type="button" class="btn btn-sm btn-success fw-bold px-3" onclick="applyCalc()">合計を入力欄へ</button>
+              </div>
+            </div>
+
             <div class="input-group">
               <span class="input-group-text">¥</span>
               <input type="number" class="form-control" id="inputAmount" placeholder="0" min="0">
@@ -441,6 +463,55 @@
   }
 
   // ==========================================
+  // ★ミニ電卓（まとめて足す）ロジック
+  // ==========================================
+  let calcSubtotalValue = 0;
+
+  function toggleCalculator() {
+    const panel = document.getElementById('calcPanel');
+    if (panel.classList.contains('d-none')) {
+      panel.classList.remove('d-none');
+      document.getElementById('calcInput').focus();
+    } else {
+      panel.classList.add('d-none');
+    }
+  }
+
+  function addCalcValue() {
+    const input = document.getElementById('calcInput');
+    const val = parseInt(input.value) || 0;
+    if (val > 0) {
+      calcSubtotalValue += val;
+      document.getElementById('calcSubtotal').innerText = `小計: ¥${calcSubtotalValue.toLocaleString()}`;
+      input.value = '';
+      input.focus();
+    }
+  }
+
+  function clearCalc() {
+    calcSubtotalValue = 0;
+    document.getElementById('calcSubtotal').innerText = `小計: ¥0`;
+    document.getElementById('calcInput').value = '';
+  }
+
+  function applyCalc() {
+    // 入力途中の値があればそれも足す
+    const input = document.getElementById('calcInput');
+    const val = parseInt(input.value) || 0;
+    if (val > 0) {
+      calcSubtotalValue += val;
+    }
+    
+    if (calcSubtotalValue > 0) {
+      document.getElementById('inputAmount').value = calcSubtotalValue;
+    }
+    
+    // パネルを閉じてリセット
+    document.getElementById('calcPanel').classList.add('d-none');
+    clearCalc();
+  }
+
+  // ==========================================
   // 基本APIロジック (取得・追加・削除・精算)
   // ==========================================
   async function fetchRoomData() {
@@ -501,12 +572,18 @@
       if (data.result === 'success') {
         document.getElementById('inputItem').value = "";
         document.getElementById('inputAmount').value = "";
-        document.getElementById('toggleGasCalc').checked = false;
-        toggleGasInputs(); // フォームを隠してリセット
         
+        // ガソリンフォームのリセット
+        document.getElementById('toggleGasCalc').checked = false;
+        toggleGasInputs(); 
         document.getElementById('gasDist').value = "";
         document.getElementById('gasEff').value = "";
         document.getElementById('gasPrice').value = "";
+
+        // 電卓のリセット
+        document.getElementById('calcPanel').classList.add('d-none');
+        clearCalc();
+
         await fetchRoomData();
       } else {
         alert("保存に失敗しました:\n" + data.message);
