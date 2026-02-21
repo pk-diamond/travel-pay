@@ -3,23 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>簡易精算</title>
+  <title>詳細精算</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     body { background-color: #fcfcfc; color: #333; font-family: sans-serif; }
     .container { max-width: 600px; margin-top: 20px; margin-bottom: 60px; }
     .card { border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 12px; }
     #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-    .fw-bold-label { font-size: 0.85rem; font-weight: bold; }
     
-    /* 湧き出しアニメーション用 */
-    .other-row {
-      animation: fadeIn 0.3s ease-out;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-5px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    /* 入力行のスタイル */
+    .expense-row { background-color: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #eee; }
+    .gas-row { background-color: #e3f2fd; border-color: #bbdefb; }
+    .delete-btn { color: #dc3545; cursor: pointer; font-size: 1.2rem; line-height: 1; margin-left: 10px;}
+    .fw-bold-label { font-size: 0.85rem; font-weight: bold; }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -32,80 +28,74 @@
 
 <div id="mainView" class="d-none">
   <div class="container">
-    <!-- ナビゲーション -->
     <div class="mb-3">
       <a href="index.html" class="text-decoration-none text-secondary fw-bold">&lt; メニューに戻る</a>
     </div>
 
-    <div class="card">
+    <!-- 設定エリア -->
+    <div class="card mb-4">
       <div class="card-body">
-        <h5 class="card-title text-center text-success mb-3 fw-bold">簡易精算フォーム</h5>
-        <form id="settlementForm">
-          
-          <!-- 行き先 -->
-          <div class="mb-4">
-            <label class="form-label fw-bold-label">旅行の行き先</label>
-            <input type="text" class="form-control" id="destination" placeholder="例：箱根温泉">
-          </div>
+        <h5 class="card-title text-center text-success mb-3 fw-bold">詳細精算設定</h5>
+        
+        <div class="mb-3">
+          <label class="form-label fw-bold-label">旅行の行き先</label>
+          <input type="text" class="form-control" id="destination" placeholder="例：北海道旅行">
+        </div>
 
-          <!-- 固定項目 -->
-          <div class="row g-2 mb-3">
-            <div class="col-6"><label class="fw-bold-label">レンタカー</label><input type="number" class="form-control amount-input" id="rentalCar" placeholder="0" min="0"></div>
-            <div class="col-6"><label class="fw-bold-label">高速代</label><input type="number" class="form-control amount-input" id="highway" placeholder="0" min="0"></div>
-          </div>
-          <div class="row g-2 mb-3">
-            <div class="col-6"><label class="fw-bold-label">宿泊代</label><input type="number" class="form-control amount-input" id="accommodation" placeholder="0" min="0"></div>
-            <div class="col-6"><label class="fw-bold-label">駐車場</label><input type="number" class="form-control amount-input" id="parking" placeholder="0" min="0"></div>
-          </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold-label">旅行の人数</label>
+          <select class="form-select" id="memberCount" onchange="updateMemberInputs()">
+            <option value="2" selected>2人</option>
+            <option value="3">3人</option>
+            <option value="4">4人</option>
+          </select>
+        </div>
+        
+        <div class="mb-2">
+          <label class="form-label fw-bold-label">メンバーの名前 <span class="badge bg-danger">必須</span></label>
+          <div id="memberNamesArea"></div>
+          <div class="form-text small text-danger" id="nameErrorMsg"></div>
+        </div>
+      </div>
+    </div>
 
-          <!-- ガソリン計算 (経路検索ボタン追加) -->
-          <div class="mb-3 p-2 bg-light rounded">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-              <label class="fw-bold-label mb-0">ガソリン (距離/燃費/単価)</label>
-              <button type="button" class="btn btn-sm btn-outline-primary py-0" style="font-size: 0.7rem;" onclick="openRouteModal()">📍 経路検索</button>
-            </div>
-            <div class="input-group input-group-sm mt-1">
-              <input type="number" class="form-control gas-calc" id="dist" placeholder="km" min="0" step="0.1">
-              <input type="number" class="form-control gas-calc" id="eff" placeholder="km/L" min="0" step="0.1">
-              <input type="number" class="form-control gas-calc" id="price" placeholder="円" min="0">
-            </div>
-            <input type="number" class="form-control amount-input mt-2 fw-bold" id="gasTotal" readonly placeholder="合計" value="0">
+    <!-- 項目入力エリア -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <h5 class="card-title text-center text-success mb-3 fw-bold">立替項目の入力</h5>
+        <div id="expenseList"></div>
+        
+        <div class="row g-2 mt-2">
+          <div class="col-6">
+            <button type="button" class="btn btn-outline-secondary w-100 fw-bold small" onclick="addExpenseRow()">
+              ＋ 通常項目
+            </button>
           </div>
-
-          <!-- その他項目（無限湧き出しコンテナ） -->
-          <div id="otherItemsContainer">
-            <!-- JSで動的に追加されます -->
+          <div class="col-6">
+            <button type="button" class="btn btn-outline-primary w-100 fw-bold small" onclick="addGasolineRow()">
+              ＋ ガソリン
+            </button>
           </div>
+        </div>
+      </div>
+    </div>
 
-          <!-- 人数選択 -->
-          <div class="mb-3 mt-4">
-            <label for="splitCount" class="form-label fw-bold-label">何人で割りますか？</label>
-            <select class="form-select" id="splitCount">
-              <option value="1">1人</option>
-              <option value="2" selected>2人</option>
-              <option value="3">3人</option>
-              <option value="4">4人</option>
-            </select>
-          </div>
+    <!-- 計算ボタン -->
+    <button type="button" class="btn btn-primary w-100 py-3 fw-bold mb-4 shadow-sm" onclick="calculate()">計算する</button>
 
-          <!-- 合計表示 -->
-          <div class="alert alert-secondary py-2 mb-3">
-            <div class="fw-bold">総額: ¥<span id="grandTotal">0</span></div>
-            <div class="small">1人: ¥<span id="perPersonTotal">0</span></div>
-          </div>
-
-          <!-- 送信ボタン -->
-          <button type="button" class="btn btn-success w-100 py-3 fw-bold" id="sendBtn" onclick="onSend()">
-            友だちを選んで送信
-          </button>
-        </form>
+    <!-- 結果表示エリア -->
+    <div id="resultCard" class="card mb-4 d-none bg-light border-success">
+      <div class="card-body">
+        <h5 class="fw-bold text-center text-dark mb-3">💰 精算結果</h5>
+        <div id="resultContent" class="mb-3 small" style="white-space: pre-wrap;"></div>
+        <button type="button" class="btn btn-success w-100 fw-bold" id="sendBtn" onclick="onSend()">結果をLINEで送信</button>
       </div>
     </div>
   </div>
 </div>
 
 <!-- ==========================================
-     追加UI: 経路検索モーダル
+     追加UI: 経路検索モーダル (ガソリン用)
 =========================================== -->
 <div class="modal fade" id="routeModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -146,7 +136,31 @@
   </div>
 </div>
 
-<!-- Bootstrap JS -->
+<!-- ==========================================
+     追加UI: ミニ電卓パネル (画面下部固定)
+=========================================== -->
+<div id="calcPanel" class="d-none position-fixed bottom-0 start-0 w-100 bg-light border-top p-3 shadow-lg" style="z-index: 1050;">
+  <div class="container" style="max-width: 600px;">
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <span class="small text-muted fw-bold">連続足し算</span>
+      <span class="badge bg-secondary" id="calcSubtotal" style="font-size: 0.85rem;">小計: ¥0</span>
+    </div>
+    <div class="text-muted mb-2" style="font-size: 0.65rem; line-height: 1.3;">
+      💡 <strong>ヒント:</strong> 金額を打って「＋次へ」を繰り返してください。
+    </div>
+    <div class="input-group input-group-sm mb-2">
+      <span class="input-group-text">¥</span>
+      <input type="number" class="form-control" id="calcInput" placeholder="金額を入力">
+      <button class="btn btn-primary fw-bold" type="button" onclick="addCalcValue()">＋ 次へ</button>
+    </div>
+    <div class="d-flex justify-content-between">
+      <button type="button" class="btn btn-sm btn-outline-danger" onclick="closeCalculator()">閉じる</button>
+      <button type="button" class="btn btn-sm btn-success fw-bold px-3" onclick="applyCalc()">金額欄に反映</button>
+    </div>
+  </div>
+</div>
+
+<!-- ★修正: モーダルを動かすためのBootstrap JSを追加 -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
@@ -158,93 +172,211 @@
     GAS_URL: "https://script.google.com/macros/s/AKfycbxK0YaFYVlqwa0F_foz-2WlguFEyrpry1dvKJ6vmDGdPkpWlfDsaWb9vQuaiHdRMC1n/exec"
   };
 
+  // ==========================================
+  // 状態管理変数
+  // ==========================================
+  let members = [];
+  let calculatedMsg = ""; 
+  let logData = {}; 
   let userProfile = { displayName: "不明", userId: "" };
-  let otherRowCount = 0; // 他項目の現在の行数
-  let routeModalInstance = null;
+  
+  // 新機能用変数
+  let currentCalcTargetInput = null; // 電卓結果を入れる対象のInput
+  let calcSubtotalValue = 0;
+  let currentRouteTargetDistInput = null; // 距離検索結果を入れる対象のInput
   let tempRouteDistance = 0;
 
   // ==========================================
-  // 初期化
+  // 初期化処理
   // ==========================================
   window.onload = function() {
-    // 最初の3行を生成
-    addOtherRow();
-    addOtherRow();
-    addOtherRow();
-
     liff.init({ liffId: CONFIG.LIFF_ID }).then(() => {
       if (!liff.isLoggedIn()) {
         liff.login();
       } else {
-        liff.getProfile().then(profile => {
-          userProfile.displayName = profile.displayName;
-          userProfile.userId = profile.userId;
+        liff.getProfile().then(p => {
+          userProfile.displayName = p.displayName;
+          userProfile.userId = p.userId;
         });
         document.getElementById('loading').classList.add('d-none');
         document.getElementById('mainView').classList.remove('d-none');
+        
+        updateMemberInputs();
+        addExpenseRow(); 
       }
     });
   };
 
   // ==========================================
-  // 無限湧き出しロジック (他項目)
+  // UI操作ロジック
   // ==========================================
-  function addOtherRow() {
-    otherRowCount++;
-    const container = document.getElementById('otherItemsContainer');
-    const div = document.createElement('div');
-    div.className = "input-group input-group-sm mb-2 other-row";
-    div.innerHTML = `
-      <span class="input-group-text">他${otherRowCount}</span>
-      <input type="text" class="form-control item-name" placeholder="項目名">
-      <input type="number" class="form-control amount-input" placeholder="0" min="0">
-    `;
-    container.appendChild(div);
-  }
 
-  // 入力が変更されるたびにイベント発火
-  document.addEventListener('input', function(e) {
-    calculateTotal(); // 全体の計算を更新
+  function updateMemberInputs() {
+    const count = parseInt(document.getElementById('memberCount').value);
+    const area = document.getElementById('memberNamesArea');
+    const currentNames = [];
+    document.querySelectorAll('.member-name-input').forEach(input => currentNames.push(input.value));
 
-    // 「他項目」の金額欄に入力された場合の無限湧き出し判定
-    if (e.target && e.target.classList.contains('amount-input') && e.target.closest('.other-row')) {
-      const allRows = document.querySelectorAll('.other-row');
-      const lastRow = allRows[allRows.length - 1];
-      // 編集されたのが「一番最後の行」で、かつ「値が入っている」場合、次の行を追加
-      if (e.target === lastRow.querySelector('.amount-input') && e.target.value !== "") {
-        addOtherRow();
-      }
+    area.innerHTML = "";
+    members = [];
+
+    for(let i=0; i<count; i++) {
+      const val = currentNames[i] || "";
+      members.push(val);
+      const div = document.createElement('div');
+      div.className = "input-group mb-2";
+      div.innerHTML = `
+        <span class="input-group-text bg-white small">メンバー${i+1}</span>
+        <input type="text" class="form-control member-name-input" value="${val}" placeholder="名前を入力" oninput="onNameChange(${i}, this.value)">
+      `;
+      area.appendChild(div);
     }
-  });
+    refreshAllPayerSelects();
+  }
 
-  function calculateTotal() {
-    // 1. ガソリン代の計算
-    const d = parseFloat(document.getElementById('dist').value) || 0;
-    const e = parseFloat(document.getElementById('eff').value) || 0;
-    const p = parseFloat(document.getElementById('price').value) || 0;
-    
-    const gas = (e > 0) ? Math.floor((d / e) * p) : 0;
-    document.getElementById('gasTotal').value = gas;
-
-    // 2. 全項目の合計計算
-    let sum = 0;
-    document.querySelectorAll('.amount-input').forEach(el => {
-      let val = parseInt(el.value) || 0;
-      if (val < 0) val = 0;
-      sum += val;
+  function onNameChange(index, newName) {
+    members[index] = newName;
+    document.getElementById('nameErrorMsg').innerText = "";
+    document.querySelectorAll('.payer-select').forEach(select => {
+      if(select.options[index]) {
+        select.options[index].text = newName || `(メンバー${index+1})`;
+      }
     });
+  }
 
-    const split = parseInt(document.getElementById('splitCount').value);
+  function refreshAllPayerSelects() {
+    document.querySelectorAll('.payer-select').forEach(select => {
+      const currentVal = select.value;
+      select.innerHTML = "";
+      members.forEach((name, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx; 
+        opt.text = name || `(メンバー${idx+1})`;
+        select.appendChild(opt);
+      });
+      select.value = (currentVal < members.length) ? currentVal : 0;
+    });
+  }
+
+  // ★通常経費行の追加 (電卓ボタン追加)
+  function addExpenseRow() {
+    const list = document.getElementById('expenseList');
+    const div = document.createElement('div');
+    div.className = "expense-row normal-row"; 
     
-    // 表示更新
-    document.getElementById('grandTotal').innerText = sum.toLocaleString();
-    document.getElementById('perPersonTotal').innerText = Math.ceil(sum / split).toLocaleString();
+    let options = "";
+    members.forEach((name, idx) => {
+        options += `<option value="${idx}">${name || `(メンバー${idx+1})`}</option>`
+    });
+    
+    div.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <input type="text" class="form-control form-control-sm me-2 item-name" placeholder="項目名">
+        <span class="delete-btn" onclick="this.parentElement.parentElement.remove()">×</span>
+      </div>
+      <div class="input-group">
+        <select class="form-select payer-select" style="max-width: 35%;">${options}</select>
+        <input type="number" class="form-control amount-input" placeholder="金額" min="0">
+        <button class="btn btn-outline-secondary px-2" type="button" onclick="openCalculator(this)">🧮</button>
+      </div>`;
+    list.appendChild(div);
+  }
+
+  // ★ガソリン経費行の追加 (経路検索ボタン追加)
+  function addGasolineRow() {
+    const list = document.getElementById('expenseList');
+    const div = document.createElement('div');
+    div.className = "expense-row gas-row"; 
+    
+    let options = "";
+    members.forEach((name, idx) => {
+        options += `<option value="${idx}">${name || `(メンバー${idx+1})`}</option>`
+    });
+    
+    div.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <input type="text" class="form-control form-control-sm me-2 item-name" value="ガソリン" placeholder="項目名">
+        <span class="delete-btn" onclick="this.parentElement.parentElement.remove()">×</span>
+      </div>
+      <div class="d-flex justify-content-end mb-2">
+         <button type="button" class="btn btn-sm btn-outline-primary py-0" style="font-size: 0.7rem;" onclick="openRouteModal(this)">📍 経路検索</button>
+      </div>
+      <div class="input-group input-group-sm mb-2">
+        <input type="number" class="form-control gas-dist" placeholder="距離km" min="0" oninput="calcGasRow(this)" step="0.1">
+        <input type="number" class="form-control gas-eff" placeholder="燃費" min="0" oninput="calcGasRow(this)" step="0.1">
+        <input type="number" class="form-control gas-price" placeholder="単価" min="0" oninput="calcGasRow(this)">
+      </div>
+      <div class="input-group">
+        <select class="form-select payer-select" style="max-width: 40%;">${options}</select>
+        <input type="number" class="form-control amount-input fw-bold bg-white" placeholder="金額" readonly>
+      </div>`;
+    list.appendChild(div);
+  }
+
+  function calcGasRow(input) {
+    const row = input.closest('.expense-row');
+    const d = parseFloat(row.querySelector('.gas-dist').value) || 0;
+    const e = parseFloat(row.querySelector('.gas-eff').value) || 0;
+    const p = parseFloat(row.querySelector('.gas-price').value) || 0;
+    
+    if (d < 0 || e < 0 || p < 0) return; 
+
+    let total = 0;
+    if (e > 0) {
+      total = Math.floor((d / e) * p);
+    }
+    row.querySelector('.amount-input').value = (total > 0) ? total : "";
   }
 
   // ==========================================
-  // ★経路検索ロジック (ポップアップ)
+  // ★ミニ電卓ロジック
   // ==========================================
-  function openRouteModal() {
+  function openCalculator(btn) {
+    // 押されたボタンの属する行の入力欄を記憶
+    currentCalcTargetInput = btn.parentElement.querySelector('.amount-input');
+    
+    document.getElementById('calcPanel').classList.remove('d-none');
+    calcSubtotalValue = 0;
+    document.getElementById('calcSubtotal').innerText = '小計: ¥0';
+    document.getElementById('calcInput').value = '';
+    document.getElementById('calcInput').focus();
+  }
+
+  function addCalcValue() {
+    const input = document.getElementById('calcInput');
+    const val = parseInt(input.value) || 0;
+    if (val > 0) {
+      calcSubtotalValue += val;
+      document.getElementById('calcSubtotal').innerText = `小計: ¥${calcSubtotalValue.toLocaleString()}`;
+      input.value = '';
+      input.focus();
+    }
+  }
+
+  function closeCalculator() {
+    document.getElementById('calcPanel').classList.add('d-none');
+  }
+
+  function applyCalc() {
+    const input = document.getElementById('calcInput');
+    const val = parseInt(input.value) || 0;
+    if (val > 0) calcSubtotalValue += val;
+    
+    if (calcSubtotalValue > 0 && currentCalcTargetInput) {
+      currentCalcTargetInput.value = calcSubtotalValue;
+    }
+    closeCalculator();
+  }
+
+  // ==========================================
+  // ★経路検索ロジック
+  // ==========================================
+  let routeModalInstance = null;
+
+  function openRouteModal(btn) {
+    const row = btn.closest('.gas-row');
+    currentRouteTargetDistInput = row.querySelector('.gas-dist');
+    
     document.getElementById('routeOrigin').value = '';
     document.getElementById('routeDest').value = '';
     document.getElementById('routeResultArea').classList.add('d-none');
@@ -316,101 +448,168 @@
   }
 
   function applyDistance(multiplier) {
-    if (tempRouteDistance > 0) {
+    if (tempRouteDistance > 0 && currentRouteTargetDistInput) {
       const finalDist = (tempRouteDistance * multiplier).toFixed(1);
-      document.getElementById('dist').value = finalDist;
-      calculateTotal(); // 距離をセットしたら再計算
+      currentRouteTargetDistInput.value = finalDist;
+      calcGasRow(currentRouteTargetDistInput); // 反映後に再計算
       
       if (routeModalInstance) routeModalInstance.hide();
     }
   }
 
   // ==========================================
+  // 計算ロジック (Core Logic)
+  // ==========================================
+  function calculate() {
+    const emptyMemberIndex = members.findIndex(m => !m || m.trim() === "");
+    if (emptyMemberIndex !== -1) {
+        alert(`メンバー${emptyMemberIndex + 1}の名前が入力されていません。\n全員の名前を入力してください。`);
+        return; 
+    }
+
+    const uniqueMembers = new Set(members.map(m => m.trim()));
+    if (uniqueMembers.size !== members.length) {
+      alert("メンバー名が重複しています。\nそれぞれ別の名前を入力してください（例: 田中A, 田中B）。");
+      document.getElementById('nameErrorMsg').innerText = "※同じ名前は使用できません";
+      return;
+    }
+
+    const payments = new Array(members.length).fill(0); 
+    let totalAmount = 0;
+    let itemsText = ""; 
+    let detailText = ""; 
+    let detailsArr = []; 
+    let hasNegativeError = false;
+
+    const expenseRows = document.querySelectorAll('.expense-row');
+    for (const row of expenseRows) {
+      const name = row.querySelector('.item-name').value || "未入力項目";
+      const payerIdx = parseInt(row.querySelector('.payer-select').value);
+      const amountInput = row.querySelector('.amount-input');
+      const amount = parseInt(amountInput.value) || 0;
+      
+      if (amount < 0) {
+        alert(`項目「${name}」の金額がマイナスになっています。\n正しい金額を入力してください。`);
+        amountInput.classList.add('is-invalid');
+        hasNegativeError = true;
+        break; 
+      } else {
+        amountInput.classList.remove('is-invalid');
+      }
+
+      if (amount > 0) {
+        payments[payerIdx] += amount;
+        totalAmount += amount;
+
+        if (row.classList.contains('gas-row')) {
+          const d = row.querySelector('.gas-dist').value;
+          const e = row.querySelector('.gas-eff').value;
+          const p = row.querySelector('.gas-price').value;
+          const gasInfo = `(${d}km / ${e}km/L / @${p}円)`;
+          
+          itemsText += `・${name}: ${amount.toLocaleString()}円 (${members[payerIdx]})\n  ${gasInfo}\n`;
+          detailText += `・${name}: ${amount}円 (${members[payerIdx]}) ${gasInfo}\n`;
+          detailsArr.push({ 
+            item: name, payer: members[payerIdx], amount: amount,
+            gasDetails: { dist: d, eff: e, price: p } 
+          });
+        } else {
+          itemsText += `・${name}: ${amount.toLocaleString()}円 (${members[payerIdx]})\n`;
+          detailText += `・${name}: ${amount}円 (${members[payerIdx]})\n`;
+          detailsArr.push({ item: name, payer: members[payerIdx], amount: amount });
+        }
+      }
+    }
+
+    if (hasNegativeError) return;
+    if (totalAmount === 0) return alert("金額が入力されていません。");
+
+    let memberTotals = "";
+    members.forEach((name, idx) => {
+      memberTotals += `・${name}: ¥${payments[idx].toLocaleString()}\n`;
+    });
+
+    const memberCount = members.length;
+    const baseShare = Math.floor(totalAmount / memberCount); 
+    const remainder = totalAmount % memberCount; 
+    
+    const balances = payments.map((paid, idx) => {
+      const burden = baseShare + (idx < remainder ? 1 : 0);
+      return { id: idx, name: members[idx], balance: paid - burden };
+    });
+
+    const creditors = balances.filter(b => b.balance > 0).sort((a,b) => b.balance - a.balance);
+    const debtors = balances.filter(b => b.balance < 0).sort((a,b) => a.balance - b.balance);
+    
+    let transactions = []; let creditorIdx = 0; let debtorIdx = 0;
+    while (creditorIdx < creditors.length && debtorIdx < debtors.length) {
+      const cred = creditors[creditorIdx]; const debt = debtors[debtorIdx];
+      const amount = Math.min(cred.balance, Math.abs(debt.balance));
+      
+      if (amount > 0) transactions.push({ from: debt.name, to: cred.name, amount: amount });
+      
+      cred.balance -= amount; debt.balance += amount;
+      if (Math.abs(cred.balance) < 1) creditorIdx++;
+      if (Math.abs(debt.balance) < 1) debtorIdx++;
+    }
+
+    const destination = document.getElementById('destination').value || "未入力";
+    
+    calculatedMsg = `【詳細精算: ${destination}】\n\n■総額: ¥${totalAmount.toLocaleString()}\n■1人あたり: 約¥${baseShare.toLocaleString()}\n\n[内訳]\n${itemsText}\n[メンバー別支払額]\n${memberTotals}\n----------------\n【精算方法】\n`;
+
+    let resultSummary = "";
+    if (transactions.length === 0) {
+      calculatedMsg += `精算なし（全員等しく支払いました）\n`;
+      resultSummary = "精算なし";
+    } else {
+      transactions.forEach(t => {
+        const line = `${t.from} → ${t.to} : ¥${t.amount.toLocaleString()}`;
+        calculatedMsg += `● ${line}\n`;
+        resultSummary += `${line}, `;
+      });
+    }
+    calculatedMsg += `----------------`;
+
+    document.getElementById('resultContent').innerText = calculatedMsg;
+    document.getElementById('resultCard').classList.remove('d-none');
+    document.getElementById('resultCard').scrollIntoView({behavior: "smooth"});
+
+    logData = {
+      type: "詳細精算", user: userProfile.displayName, userId: userProfile.userId,
+      destination: destination, total: totalAmount, count: memberCount,
+      summary: resultSummary, textDetail: detailText, jsonDetail: JSON.stringify(detailsArr)
+    };
+  }
+
+  // ==========================================
   // 送信処理
   // ==========================================
   function onSend() {
-    if (!liff.isLoggedIn()) return alert("再ログインしてください");
+    if (!calculatedMsg) return;
     if (!CONFIG.GAS_URL) return alert("システムエラー: GAS_URLが設定されていません");
-
+    
     const btn = document.getElementById('sendBtn');
-    
-    // 二重送信防止
-    btn.disabled = true; 
-    btn.innerText = "処理中..."; 
-    
-    const destination = document.getElementById('destination').value || "未入力";
-    const totalAmountStr = document.getElementById('grandTotal').innerText.replace(/,/g, '');
-    const totalAmount = parseInt(totalAmountStr) || 0;
-    const splitCount = document.getElementById('splitCount').value;
-    const perPerson = document.getElementById('perPersonTotal').innerText;
+    btn.disabled = true; btn.innerText = "送信中...";
 
-    let msg = `【簡易精算: ${destination}】\n`;
-    let detailText = ""; 
-    let jsonData = { basic: {}, gas: {}, others: [] };
-
-    const addBasic = (id, name, key) => {
-      const v = parseInt(document.getElementById(id).value) || 0;
-      if (v > 0) {
-        msg += `\n■${name}: ¥${v.toLocaleString()}`;
-        detailText += `・${name}: ${v}円\n`;
-        jsonData.basic[key] = v;
-      }
-    };
-
-    addBasic('rentalCar', 'レンタカー', 'rental');
-    addBasic('highway', '高速', 'highway');
-    addBasic('accommodation', '宿泊', 'accommodation');
-    addBasic('parking', '駐車場', 'parking');
-    
-    const gas = parseInt(document.getElementById('gasTotal').value) || 0;
-    if(gas > 0) {
-      const d = document.getElementById('dist').value;
-      const e = document.getElementById('eff').value;
-      const p = document.getElementById('price').value;
-      const info = `(${d}km / ${e}km/L / @${p}円)`;
-      msg += `\n■ガソリン: ¥${gas.toLocaleString()}\n${info}`;
-      detailText += `・ガソリン: ${gas}円 ${info}\n`;
-      jsonData.gas = { amount: gas, dist: d, eff: e, price: p };
-    }
-    
-    // その他項目 (動的に生成された行をすべて取得)
-    document.querySelectorAll('.other-row').forEach(row => {
-      const name = row.querySelector('.item-name').value || 'その他';
-      const val = parseInt(row.querySelector('.amount-input').value) || 0;
-      if (val > 0) {
-        const line = `■${name}: ¥${val.toLocaleString()}`;
-        msg += `\n${line}`;
-        detailText += `・${name}: ${val}円\n`;
-        jsonData.others.push({ item: name, amount: val });
-      }
-    });
-
-    const summary = `総額: ¥${totalAmount.toLocaleString()} (1人: ¥${perPerson})`;
-    msg += `\n\n${summary}`;
-    msg += `\n\n----------------\n▼このBotを友だち追加\nhttps://lin.ee/A8jCBxs`; 
-
-    const logData = {
-      type: "簡易精算", user: userProfile.displayName, userId: userProfile.userId,
-      destination: destination, total: totalAmount, count: splitCount,
-      summary: summary, textDetail: detailText, jsonDetail: JSON.stringify(jsonData)
-    };
-    
     fetch(CONFIG.GAS_URL, {
       method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(logData)
     }).catch(e => console.error("Log send error:", e));
 
+    const footerLink = `\n\n▼このBotを友だち追加\nhttps://lin.ee/A8jCBxs`;
+    const finalMsg = calculatedMsg + footerLink;
+
     if (liff.isApiAvailable('shareTargetPicker')) {
-      liff.shareTargetPicker([{ type: "text", text: msg }])
-      .then((res) => {
+      liff.shareTargetPicker([{ type: "text", text: finalMsg }])
+      .then(res => { 
         if (res) { alert("送信しました！"); liff.closeWindow(); } 
-        else { alert("キャンセルしました"); btn.disabled = false; btn.innerText = "友だちを選んで送信"; }
-      }).catch(err => {
-        alert("送信に失敗しました"); btn.disabled = false; btn.innerText = "友だちを選んで送信";
+        else { alert("キャンセルしました"); btn.disabled = false; btn.innerText = "結果をLINEで送信"; }
+      })
+      .catch(err => {
+        alert("送信に失敗しました"); btn.disabled = false; btn.innerText = "結果をLINEで送信";
       });
     } else {
-      liff.sendMessages([{ type: 'text', text: msg }])
-      .then(() => { alert("Botとのトークルームに送信しました。"); liff.closeWindow(); })
-      .catch((err) => { alert("送信できませんでした。"); btn.disabled = false; btn.innerText = "友だちを選んで送信"; });
+      liff.sendMessages([{ type: 'text', text: finalMsg }])
+      .then(() => { alert("Botとのトークルームに送信しました。"); liff.closeWindow(); });
     }
   }
 </script>
