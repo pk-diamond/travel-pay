@@ -23,17 +23,17 @@
     }
     .menu-card:active { transform: scale(0.98); }
     
-    /* ヘルプボタン (修正: 視認性向上) */
+    /* ヘルプボタン */
     .help-btn {
       font-size: 1.1rem;
-      color: #198754; /* 緑文字 */
-      background-color: #e8f5e9; /* 薄い緑背景 */
+      color: #198754; 
+      background-color: #e8f5e9; 
       width: 36px;
       height: 36px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 50%; /* 丸く */
+      border-radius: 50%; 
       cursor: pointer;
       transition: background-color 0.2s;
       font-weight: bold;
@@ -79,6 +79,14 @@
     
     <p class="text-center text-muted small mb-4">精算方法を選択してください</p>
 
+    <!-- ★順番変更: リアルタイム精算をTOPに -->
+    <a href="realtime_entry.html" class="text-decoration-none">
+      <div class="card menu-card bg-white border border-primary">
+        <h5 class="fw-bold text-primary mb-2">⏱️ リアルタイム精算</h5>
+        <p class="text-muted small mb-0">旅行中にみんなで入力＆共有（履歴保存）</p>
+      </div>
+    </a>
+
     <!-- 簡易精算ボタン -->
     <a href="simple.html" class="text-decoration-none">
       <div class="card menu-card bg-white">
@@ -95,14 +103,6 @@
       </div>
     </a>
 
-    <!-- リアルタイム精算 -->
-    <a href="realtime_entry.html" class="text-decoration-none">
-      <div class="card menu-card bg-white border border-primary">
-        <h5 class="fw-bold text-primary mb-2">⏱️ リアルタイム精算</h5>
-        <p class="text-muted small mb-0">旅行中にみんなで入力＆共有</p>
-      </div>
-    </a>
-
     <!-- フッタークレジット -->
     <div class="text-center mt-5">
       <p class="text-muted footer-credit">
@@ -113,7 +113,7 @@
   </div>
 </div>
 
-<!-- 案2: ヘルプモーダル -->
+<!-- ヘルプモーダル -->
 <div class="modal fade" id="helpModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow">
@@ -123,7 +123,6 @@
       </div>
       <div class="modal-body pt-2">
         
-        <!-- 共通機能の説明追加 -->
         <div class="alert alert-success bg-opacity-10 border-0 p-2 mb-3 text-center small">
           <strong>💡 共通機能</strong><br>
           どのモードでも、計算結果を<br>LINEで友だちに送信・共有できます。
@@ -131,6 +130,15 @@
 
         <div class="list-group list-group-flush">
           
+          <!-- ★順番変更: リアルタイム精算を一番上に -->
+          <div class="list-group-item border-0 px-0 py-3">
+            <h6 class="fw-bold text-primary mb-1">⏱️ リアルタイム精算</h6>
+            <p class="small text-muted mb-0">
+              <strong>「支払いのたびに、各自がスマホで記録したい」</strong><br>
+              ルームを作ってデータを共有・保存します。
+            </p>
+          </div>
+
           <div class="list-group-item border-0 px-0 py-3">
             <h6 class="fw-bold text-success mb-1">🚗 簡易精算</h6>
             <p class="small text-muted mb-0">
@@ -147,14 +155,6 @@
             </p>
           </div>
 
-          <div class="list-group-item border-0 px-0 py-3">
-            <h6 class="fw-bold text-primary mb-1">⏱️ リアルタイム精算</h6>
-            <p class="small text-muted mb-0">
-              <strong>「支払いのたびに、各自がスマホで記録したい」</strong><br>
-              ルームを作ってデータを共有・保存します。
-            </p>
-          </div>
-
         </div>
         <div class="mt-3 text-center">
           <button type="button" class="btn btn-outline-secondary btn-sm w-100" data-bs-dismiss="modal">閉じる</button>
@@ -164,7 +164,7 @@
   </div>
 </div>
 
-<!-- Bootstrap JS (モーダル用) -->
+<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
@@ -181,11 +181,9 @@
   window.onload = function() {
     liff.init({ liffId: CONFIG.LIFF_ID })
       .then(() => {
-        // ログインしていない場合はログイン画面へ誘導
         if (!liff.isLoggedIn()) {
           liff.login();
         } else {
-          // ログイン済みなら画面を表示
           document.getElementById('loading').classList.add('d-none');
           document.getElementById('mainView').classList.remove('d-none');
         }
