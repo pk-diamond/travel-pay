@@ -87,10 +87,75 @@
     <div id="resultCard" class="card mb-4 d-none bg-light border-success">
       <div class="card-body">
         <h5 class="fw-bold text-center text-dark mb-3">💰 精算結果</h5>
-        <!-- プレビュー表示用 (リンクなし) -->
         <div id="resultContent" class="mb-3 small" style="white-space: pre-wrap;"></div>
         <button type="button" class="btn btn-success w-100 fw-bold" id="sendBtn" onclick="onSend()">結果をLINEで送信</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==========================================
+     追加UI: 経路検索モーダル (ガソリン用)
+=========================================== -->
+<div class="modal fade" id="routeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light py-2">
+        <h5 class="modal-title fw-bold fs-6">📍 経路から距離を調べる</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group input-group-sm mb-2">
+          <button class="btn btn-outline-secondary" type="button" onclick="getCurrentLocation()" id="btnLocation">現在地</button>
+          <input type="text" class="form-control" id="routeOrigin" placeholder="出発地 (住所や施設名)">
+        </div>
+        <div class="input-group input-group-sm mb-1">
+          <span class="input-group-text">行先</span>
+          <input type="text" class="form-control" id="routeDest" placeholder="例: 野沢温泉スキー場">
+          <button class="btn btn-secondary fw-bold" type="button" onclick="searchRoute()" id="btnSearchRoute">検索</button>
+        </div>
+        
+        <div id="routeResultArea" class="d-none mt-3 p-2 bg-light border rounded">
+          <div id="routeLoading" class="d-none text-center text-muted small py-1">検索中...</div>
+          <div id="routeData" class="d-none">
+            <div class="text-center mb-1">
+              <span class="small text-muted">ルート距離: </span>
+              <strong class="text-primary fs-5" id="resDist">0</strong> <span class="text-primary fw-bold">km</span>
+            </div>
+            <div class="text-muted bg-white p-1 rounded border mb-2" style="font-size: 0.65rem; line-height: 1.2;">
+              認識された目的地:<br><span id="resAddress" class="fw-bold text-dark"></span>
+            </div>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1 py-1" onclick="applyDistance(1)">➡️ 片道で反映</button>
+              <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1 py-1" onclick="applyDistance(2)">↔️ 往復で反映</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==========================================
+     追加UI: ミニ電卓パネル (画面下部固定)
+=========================================== -->
+<div id="calcPanel" class="d-none position-fixed bottom-0 start-0 w-100 bg-light border-top p-3 shadow-lg" style="z-index: 1050;">
+  <div class="container" style="max-width: 600px;">
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <span class="small text-muted fw-bold">連続足し算</span>
+      <span class="badge bg-secondary" id="calcSubtotal" style="font-size: 0.85rem;">小計: ¥0</span>
+    </div>
+    <div class="text-muted mb-2" style="font-size: 0.65rem; line-height: 1.3;">
+      💡 <strong>ヒント:</strong> 金額を打って「＋次へ」を繰り返してください。
+    </div>
+    <div class="input-group input-group-sm mb-2">
+      <span class="input-group-text">¥</span>
+      <input type="number" class="form-control" id="calcInput" placeholder="金額を入力">
+      <button class="btn btn-primary fw-bold" type="button" onclick="addCalcValue()">＋ 次へ</button>
+    </div>
+    <div class="d-flex justify-content-between">
+      <button type="button" class="btn btn-sm btn-outline-danger" onclick="closeCalculator()">閉じる</button>
+      <button type="button" class="btn btn-sm btn-success fw-bold px-3" onclick="applyCalc()">金額欄に反映</button>
     </div>
   </div>
 </div>
@@ -108,9 +173,15 @@
   // 状態管理変数
   // ==========================================
   let members = [];
-  let calculatedMsg = ""; // 本文のみ
+  let calculatedMsg = ""; 
   let logData = {}; 
   let userProfile = { displayName: "不明", userId: "" };
+  
+  // 新機能用変数
+  let currentCalcTargetInput = null; // 電卓結果を入れる対象のInput
+  let calcSubtotalValue = 0;
+  let currentRouteTargetDistInput = null; // 距離検索結果を入れる対象のInput
+  let tempRouteDistance = 0;
 
   // ==========================================
   // 初期化処理
@@ -127,7 +198,6 @@
         document.getElementById('loading').classList.add('d-none');
         document.getElementById('mainView').classList.remove('d-none');
         
-        // 初期表示構築
         updateMemberInputs();
         addExpenseRow(); 
       }
@@ -138,12 +208,9 @@
   // UI操作ロジック
   // ==========================================
 
-  // メンバー人数変更時の入力欄更新
   function updateMemberInputs() {
     const count = parseInt(document.getElementById('memberCount').value);
     const area = document.getElementById('memberNamesArea');
-    
-    // 現在入力されている名前を一時保存
     const currentNames = [];
     document.querySelectorAll('.member-name-input').forEach(input => currentNames.push(input.value));
 
@@ -153,7 +220,6 @@
     for(let i=0; i<count; i++) {
       const val = currentNames[i] || "";
       members.push(val);
-      
       const div = document.createElement('div');
       div.className = "input-group mb-2";
       div.innerHTML = `
@@ -162,15 +228,12 @@
       `;
       area.appendChild(div);
     }
-    // 立替人のプルダウンも更新
     refreshAllPayerSelects();
   }
 
-  // 名前入力時の同期処理
   function onNameChange(index, newName) {
     members[index] = newName;
     document.getElementById('nameErrorMsg').innerText = "";
-    
     document.querySelectorAll('.payer-select').forEach(select => {
       if(select.options[index]) {
         select.options[index].text = newName || `(メンバー${index+1})`;
@@ -178,7 +241,6 @@
     });
   }
 
-  // 全ての立替人プルダウンを再構築
   function refreshAllPayerSelects() {
     document.querySelectorAll('.payer-select').forEach(select => {
       const currentVal = select.value;
@@ -193,7 +255,7 @@
     });
   }
 
-  // 通常経費行の追加
+  // ★通常経費行の追加 (電卓ボタン追加)
   function addExpenseRow() {
     const list = document.getElementById('expenseList');
     const div = document.createElement('div');
@@ -210,13 +272,14 @@
         <span class="delete-btn" onclick="this.parentElement.parentElement.remove()">×</span>
       </div>
       <div class="input-group">
-        <select class="form-select payer-select" style="max-width: 40%;">${options}</select>
+        <select class="form-select payer-select" style="max-width: 35%;">${options}</select>
         <input type="number" class="form-control amount-input" placeholder="金額" min="0">
+        <button class="btn btn-outline-secondary px-2" type="button" onclick="openCalculator(this)">🧮</button>
       </div>`;
     list.appendChild(div);
   }
 
-  // ガソリン経費行の追加
+  // ★ガソリン経費行の追加 (経路検索ボタン追加)
   function addGasolineRow() {
     const list = document.getElementById('expenseList');
     const div = document.createElement('div');
@@ -228,13 +291,16 @@
     });
     
     div.innerHTML = `
-      <div class="d-flex justify-content-between align-items-center mb-2">
+      <div class="d-flex justify-content-between align-items-center mb-1">
         <input type="text" class="form-control form-control-sm me-2 item-name" value="ガソリン" placeholder="項目名">
         <span class="delete-btn" onclick="this.parentElement.parentElement.remove()">×</span>
       </div>
+      <div class="d-flex justify-content-end mb-2">
+         <button type="button" class="btn btn-sm btn-outline-primary py-0" style="font-size: 0.7rem;" onclick="openRouteModal(this)">📍 経路検索</button>
+      </div>
       <div class="input-group input-group-sm mb-2">
-        <input type="number" class="form-control gas-dist" placeholder="距離km" min="0" oninput="calcGasRow(this)">
-        <input type="number" class="form-control gas-eff" placeholder="燃費" min="0" oninput="calcGasRow(this)">
+        <input type="number" class="form-control gas-dist" placeholder="距離km" min="0" oninput="calcGasRow(this)" step="0.1">
+        <input type="number" class="form-control gas-eff" placeholder="燃費" min="0" oninput="calcGasRow(this)" step="0.1">
         <input type="number" class="form-control gas-price" placeholder="単価" min="0" oninput="calcGasRow(this)">
       </div>
       <div class="input-group">
@@ -244,7 +310,6 @@
     list.appendChild(div);
   }
 
-  // ガソリン行の自動計算
   function calcGasRow(input) {
     const row = input.closest('.expense-row');
     const d = parseFloat(row.querySelector('.gas-dist').value) || 0;
@@ -261,17 +326,144 @@
   }
 
   // ==========================================
+  // ★ミニ電卓ロジック
+  // ==========================================
+  function openCalculator(btn) {
+    // 押されたボタンの属する行の入力欄を記憶
+    currentCalcTargetInput = btn.parentElement.querySelector('.amount-input');
+    
+    document.getElementById('calcPanel').classList.remove('d-none');
+    calcSubtotalValue = 0;
+    document.getElementById('calcSubtotal').innerText = '小計: ¥0';
+    document.getElementById('calcInput').value = '';
+    document.getElementById('calcInput').focus();
+  }
+
+  function addCalcValue() {
+    const input = document.getElementById('calcInput');
+    const val = parseInt(input.value) || 0;
+    if (val > 0) {
+      calcSubtotalValue += val;
+      document.getElementById('calcSubtotal').innerText = `小計: ¥${calcSubtotalValue.toLocaleString()}`;
+      input.value = '';
+      input.focus();
+    }
+  }
+
+  function closeCalculator() {
+    document.getElementById('calcPanel').classList.add('d-none');
+  }
+
+  function applyCalc() {
+    const input = document.getElementById('calcInput');
+    const val = parseInt(input.value) || 0;
+    if (val > 0) calcSubtotalValue += val;
+    
+    if (calcSubtotalValue > 0 && currentCalcTargetInput) {
+      currentCalcTargetInput.value = calcSubtotalValue;
+    }
+    closeCalculator();
+  }
+
+  // ==========================================
+  // ★経路検索ロジック
+  // ==========================================
+  let routeModalInstance = null;
+
+  function openRouteModal(btn) {
+    const row = btn.closest('.gas-row');
+    currentRouteTargetDistInput = row.querySelector('.gas-dist');
+    
+    document.getElementById('routeOrigin').value = '';
+    document.getElementById('routeDest').value = '';
+    document.getElementById('routeResultArea').classList.add('d-none');
+    
+    if (!routeModalInstance) {
+        routeModalInstance = new bootstrap.Modal(document.getElementById('routeModal'));
+    }
+    routeModalInstance.show();
+  }
+
+  function getCurrentLocation() {
+    const btn = document.getElementById('btnLocation');
+    const originInput = document.getElementById('routeOrigin');
+    
+    btn.disabled = true; originInput.value = "取得中..."; originInput.disabled = true;
+
+    if (!navigator.geolocation) {
+      alert("位置情報に対応していません。");
+      originInput.value = ""; originInput.disabled = false; btn.disabled = false; return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        originInput.value = `${pos.coords.latitude},${pos.coords.longitude}`;
+        originInput.disabled = false; btn.disabled = false;
+      },
+      (err) => {
+        alert("位置情報の取得に失敗しました。手動で入力してください。");
+        originInput.value = ""; originInput.disabled = false; btn.disabled = false;
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }
+
+  async function searchRoute() {
+    const origin = document.getElementById('routeOrigin').value.trim();
+    const dest = document.getElementById('routeDest').value.trim();
+
+    if (!origin || !dest) return alert("出発地と行先を入力してください");
+
+    const resultArea = document.getElementById('routeResultArea');
+    const routeLoading = document.getElementById('routeLoading');
+    const routeData = document.getElementById('routeData');
+    const btnSearch = document.getElementById('btnSearchRoute');
+
+    resultArea.classList.remove('d-none'); routeLoading.classList.remove('d-none');
+    routeData.classList.add('d-none'); btnSearch.disabled = true;
+
+    try {
+      const response = await fetch(CONFIG.GAS_URL, {
+        method: "POST", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: 'calc_distance', origin: origin, destination: dest })
+      });
+      const data = await response.json();
+
+      if (data.result === 'success') {
+        tempRouteDistance = parseFloat(data.data.distance);
+        document.getElementById('resDist').innerText = data.data.distance;
+        document.getElementById('resAddress').innerText = data.data.address;
+        routeLoading.classList.add('d-none'); routeData.classList.remove('d-none');
+      } else {
+        alert("検索エラー:\n" + data.message); resultArea.classList.add('d-none');
+      }
+    } catch (e) {
+      alert("通信エラーが発生しました"); resultArea.classList.add('d-none');
+    } finally {
+      btnSearch.disabled = false;
+    }
+  }
+
+  function applyDistance(multiplier) {
+    if (tempRouteDistance > 0 && currentRouteTargetDistInput) {
+      const finalDist = (tempRouteDistance * multiplier).toFixed(1);
+      currentRouteTargetDistInput.value = finalDist;
+      calcGasRow(currentRouteTargetDistInput); // 反映後に再計算
+      
+      if (routeModalInstance) routeModalInstance.hide();
+    }
+  }
+
+  // ==========================================
   // 計算ロジック (Core Logic)
   // ==========================================
   function calculate() {
-    // 1. バリデーション: メンバー名入力チェック
     const emptyMemberIndex = members.findIndex(m => !m || m.trim() === "");
     if (emptyMemberIndex !== -1) {
         alert(`メンバー${emptyMemberIndex + 1}の名前が入力されていません。\n全員の名前を入力してください。`);
         return; 
     }
 
-    // 2. バリデーション: メンバー名重複チェック
     const uniqueMembers = new Set(members.map(m => m.trim()));
     if (uniqueMembers.size !== members.length) {
       alert("メンバー名が重複しています。\nそれぞれ別の名前を入力してください（例: 田中A, 田中B）。");
@@ -279,15 +471,13 @@
       return;
     }
 
-    // 集計用変数
-    const payments = new Array(members.length).fill(0); // 各メンバーの支払済額
+    const payments = new Array(members.length).fill(0); 
     let totalAmount = 0;
     let itemsText = ""; 
     let detailText = ""; 
     let detailsArr = []; 
     let hasNegativeError = false;
 
-    // 各行の集計
     const expenseRows = document.querySelectorAll('.expense-row');
     for (const row of expenseRows) {
       const name = row.querySelector('.item-name').value || "未入力項目";
@@ -295,7 +485,6 @@
       const amountInput = row.querySelector('.amount-input');
       const amount = parseInt(amountInput.value) || 0;
       
-      // マイナス値チェック
       if (amount < 0) {
         alert(`項目「${name}」の金額がマイナスになっています。\n正しい金額を入力してください。`);
         amountInput.classList.add('is-invalid');
@@ -318,9 +507,7 @@
           itemsText += `・${name}: ${amount.toLocaleString()}円 (${members[payerIdx]})\n  ${gasInfo}\n`;
           detailText += `・${name}: ${amount}円 (${members[payerIdx]}) ${gasInfo}\n`;
           detailsArr.push({ 
-            item: name, 
-            payer: members[payerIdx], 
-            amount: amount,
+            item: name, payer: members[payerIdx], amount: amount,
             gasDetails: { dist: d, eff: e, price: p } 
           });
         } else {
@@ -334,13 +521,11 @@
     if (hasNegativeError) return;
     if (totalAmount === 0) return alert("金額が入力されていません。");
 
-    // メンバーごとの支払合計表示用
     let memberTotals = "";
     members.forEach((name, idx) => {
       memberTotals += `・${name}: ¥${payments[idx].toLocaleString()}\n`;
     });
 
-    // --- 債権債務の計算アルゴリズム ---
     const memberCount = members.length;
     const baseShare = Math.floor(totalAmount / memberCount); 
     const remainder = totalAmount % memberCount; 
@@ -353,36 +538,21 @@
     const creditors = balances.filter(b => b.balance > 0).sort((a,b) => b.balance - a.balance);
     const debtors = balances.filter(b => b.balance < 0).sort((a,b) => a.balance - b.balance);
     
-    let transactions = [];
-    let creditorIdx = 0; 
-    let debtorIdx = 0;
-
+    let transactions = []; let creditorIdx = 0; let debtorIdx = 0;
     while (creditorIdx < creditors.length && debtorIdx < debtors.length) {
-      const cred = creditors[creditorIdx];
-      const debt = debtors[debtorIdx];
-      
+      const cred = creditors[creditorIdx]; const debt = debtors[debtorIdx];
       const amount = Math.min(cred.balance, Math.abs(debt.balance));
       
-      if (amount > 0) {
-        transactions.push({ from: debt.name, to: cred.name, amount: amount });
-      }
+      if (amount > 0) transactions.push({ from: debt.name, to: cred.name, amount: amount });
       
-      cred.balance -= amount; 
-      debt.balance += amount;
-      
+      cred.balance -= amount; debt.balance += amount;
       if (Math.abs(cred.balance) < 1) creditorIdx++;
       if (Math.abs(debt.balance) < 1) debtorIdx++;
     }
 
-    // --- メッセージ構築 ---
     const destination = document.getElementById('destination').value || "未入力";
     
-    calculatedMsg = `【詳細精算: ${destination}】\n\n`;
-    calculatedMsg += `■総額: ¥${totalAmount.toLocaleString()}\n`;
-    calculatedMsg += `■1人あたり: 約¥${baseShare.toLocaleString()}\n\n`;
-    calculatedMsg += `[内訳]\n${itemsText}\n`;
-    calculatedMsg += `[メンバー別支払額]\n${memberTotals}\n`;
-    calculatedMsg += `----------------\n【精算方法】\n`;
+    calculatedMsg = `【詳細精算: ${destination}】\n\n■総額: ¥${totalAmount.toLocaleString()}\n■1人あたり: 約¥${baseShare.toLocaleString()}\n\n[内訳]\n${itemsText}\n[メンバー別支払額]\n${memberTotals}\n----------------\n【精算方法】\n`;
 
     let resultSummary = "";
     if (transactions.length === 0) {
@@ -396,24 +566,15 @@
       });
     }
     calculatedMsg += `----------------`;
-    // ★変更点: ここではリンクを付与しない (プレビュー用)
 
-    // 結果表示
     document.getElementById('resultContent').innerText = calculatedMsg;
     document.getElementById('resultCard').classList.remove('d-none');
     document.getElementById('resultCard').scrollIntoView({behavior: "smooth"});
 
-    // GAS用ログデータ準備
     logData = {
-      type: "詳細精算",
-      user: userProfile.displayName,
-      userId: userProfile.userId,
-      destination: destination,
-      total: totalAmount,
-      count: memberCount,
-      summary: resultSummary,
-      textDetail: detailText,
-      jsonDetail: JSON.stringify(detailsArr)
+      type: "詳細精算", user: userProfile.displayName, userId: userProfile.userId,
+      destination: destination, total: totalAmount, count: memberCount,
+      summary: resultSummary, textDetail: detailText, jsonDetail: JSON.stringify(detailsArr)
     };
   }
 
@@ -425,45 +586,27 @@
     if (!CONFIG.GAS_URL) return alert("システムエラー: GAS_URLが設定されていません");
     
     const btn = document.getElementById('sendBtn');
-    btn.disabled = true;
-    btn.innerText = "送信中...";
+    btn.disabled = true; btn.innerText = "送信中...";
 
-    // 1. GASへ送信
     fetch(CONFIG.GAS_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(logData)
+      method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(logData)
     }).catch(e => console.error("Log send error:", e));
 
-    // ★変更点: 送信直前にリンクを結合する
     const footerLink = `\n\n▼このBotを友だち追加\nhttps://lin.ee/A8jCBxs`;
     const finalMsg = calculatedMsg + footerLink;
 
-    // 2. LINE ShareTargetPicker 起動
     if (liff.isApiAvailable('shareTargetPicker')) {
       liff.shareTargetPicker([{ type: "text", text: finalMsg }])
       .then(res => { 
-        if (res) { 
-          alert("送信しました！"); 
-          liff.closeWindow(); 
-        } else {
-          alert("キャンセルしました"); 
-          btn.disabled = false;
-          btn.innerText = "結果をLINEで送信";
-        }
+        if (res) { alert("送信しました！"); liff.closeWindow(); } 
+        else { alert("キャンセルしました"); btn.disabled = false; btn.innerText = "結果をLINEで送信"; }
       })
       .catch(err => {
-        alert("送信に失敗しました");
-        btn.disabled = false;
-        btn.innerText = "結果をLINEで送信";
+        alert("送信に失敗しました"); btn.disabled = false; btn.innerText = "結果をLINEで送信";
       });
     } else {
       liff.sendMessages([{ type: 'text', text: finalMsg }])
-      .then(() => { 
-        alert("Botとのトークルームに送信しました。"); 
-        liff.closeWindow(); 
-      });
+      .then(() => { alert("Botとのトークルームに送信しました。"); liff.closeWindow(); });
     }
   }
 </script>
